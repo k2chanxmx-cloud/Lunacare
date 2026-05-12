@@ -314,6 +314,12 @@ def index():
         WHERE DATE(vomited_at) = %s
     """, (today,))["count"]
 
+    sleep_count = query_one("""
+        SELECT COUNT(*) AS count
+        FROM work_sleep_logs
+        WHERE DATE(slept_at) = %s
+    """, (today,))["count"]
+
     active_cycle = query_one("""
         SELECT *
         FROM cycle_modes
