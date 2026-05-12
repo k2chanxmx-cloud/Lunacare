@@ -20,10 +20,8 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 JST = timezone(timedelta(hours=9))
 
-# Zutool 気圧API用
-KIATSU_AREA_CODE = os.environ.get("KIATSU_AREA_CODE", "13108")  # 江東区
+KIATSU_AREA_CODE = os.environ.get("KIATSU_AREA_CODE", "13108")
 KIATSU_AREA_NAME = os.environ.get("KIATSU_AREA_NAME", "東京・江東区")
-
 
 PRESSURE_LEVEL = {
     "0": "通常",
@@ -233,6 +231,39 @@ def save_weather_log(weather):
         weather["weather_code"],
     ))
 
+def auto_update_weather_if_needed():
+
+    latest = query_one("""
+        SELECT logged_at
+        FROM weather_logs
+        ORDER BY logged_at DESC
+        LIMIT 1
+    """)
+
+    now = now_jst().replace(tzinfo=None)
+
+    # 最終更新が存在する場合
+    if latest and latest["logged_at"]:
+
+        diff = now - latest["logged_at"]
+
+        # 1時間以内なら更新しない
+        if diff.total_seconds() < 3600:
+            return False
+
+    try:
+        weather_data = fetch_weather_from_zutool()
+        save_weather_log(weather_data)
+
+        print("気圧自動更新OK")
+
+        return True
+
+    except Exception as e:
+
+        print("気圧自動更新失敗:", e)
+
+        return False
 
 @app.route("/weather/update")
 def weather_update():
@@ -264,6 +295,7 @@ def weather():
         "weather.html",
         logs=logs,
         latest=latest,
+        pressure_level_map=PRESSURE_LEVEL,
     )
 
 
@@ -272,6 +304,8 @@ def weather():
 # =========================
 @app.route("/")
 def index():
+	auto_update_weather_if_needed()
+	
     today = now_jst().date()
 
     vomit_count = query_one("""
@@ -893,6 +927,220 @@ def check_alerts():
 @app.route("/api/alerts")
 def api_alerts():
     return jsonify(check_alerts())
+
+
+# =========================
+# 相関分析
+# =========================
+@app.route("/analysis")
+def analysis():
+    days = int(request.args.get("days", 30))
+    start_date = now_jst().date() - timedelta(days=days - 1)
+
+    pressure_condition = query_all("""
+        SELECT
+            COALESCE(w.weather_code, 0) AS pressure_level,
+            COUNT(c.id) AS log_count,
+            ROUND(AVG(c.sleepiness_level)::numeric, 2) AS avg_sleepiness,
+            ROUND(AVG(c.headache_level)::numeric, 2) AS avg_headache,
+            ROUND(AVG(c.nausea_level)::numeric, 2) AS avg_nausea,
+            ROUND(AVG(c.vomit_feeling_level)::numeric, 2) AS avg_vomit_feeling,
+            MAX(c.sleepiness_level) AS max_sleepiness,
+            MAX(c.headache_level) AS max_headache,
+            MAX(c.nausea_level) AS max_nausea,
+            MAX(c.vomit_feeling_level) AS max_vomit_feeling
+        FROM body_condition_logs c
+        LEFT JOIN weather_logs w
+            ON c.weather_log_id = w.id
+        WHERE DATE(c.logged_at) >= %s
+        GROUP BY COALESCE(w.weather_code, 0)
+        ORDER BY pressure_level
+    """, (start_date,))
+
+    low_heart_days = query_one("""
+        WITH low_days AS (
+            SELECT DISTINCT log_date
+            FROM diary_logs
+            WHERE log_date >= %s
+              AND heart_score <= 2
+        )
+        SELECT
+            COUNT(DISTINCT ld.log_date) AS low_heart_day_count,
+            COUNT(v.id) AS vomit_count,
+            COUNT(ws.id) AS work_sleep_count
+        FROM low_days ld
+        LEFT JOIN vomit_logs v
+            ON DATE(v.vomited_at) = ld.log_date
+        LEFT JOIN work_sleep_logs ws
+            ON DATE(ws.slept_at) = ld.log_date
+    """, (start_date,))
+
+    cycle_vomit = query_one("""
+        WITH days AS (
+            SELECT generate_series(%s::date, CURRENT_DATE, interval '1 day')::date AS d
+        ),
+        cycle_days AS (
+            SELECT d.d
+            FROM days d
+            JOIN cycle_modes c
+              ON d.d >= DATE(c.started_at)
+             AND d.d <= COALESCE(DATE(c.ended_at), CURRENT_DATE)
+        )
+        SELECT
+            COUNT(DISTINCT cd.d) AS cycle_day_count,
+            COUNT(v.id) AS vomit_count
+        FROM cycle_days cd
+        LEFT JOIN vomit_logs v
+            ON DATE(v.vomited_at) = cd.d
+    """, (start_date,))
+
+    non_cycle_vomit = query_one("""
+        WITH days AS (
+            SELECT generate_series(%s::date, CURRENT_DATE, interval '1 day')::date AS d
+        ),
+        cycle_days AS (
+            SELECT d.d
+            FROM days d
+            JOIN cycle_modes c
+              ON d.d >= DATE(c.started_at)
+             AND d.d <= COALESCE(DATE(c.ended_at), CURRENT_DATE)
+        ),
+        non_cycle_days AS (
+            SELECT d.d
+            FROM days d
+            LEFT JOIN cycle_days cd ON d.d = cd.d
+            WHERE cd.d IS NULL
+        )
+        SELECT
+            COUNT(DISTINCT nd.d) AS non_cycle_day_count,
+            COUNT(v.id) AS vomit_count
+        FROM non_cycle_days nd
+        LEFT JOIN vomit_logs v
+            ON DATE(v.vomited_at) = nd.d
+    """, (start_date,))
+
+    medicine_skip_condition = query_all("""
+        SELECT
+            m.name,
+            COUNT(l.id) FILTER (WHERE l.status IN ('skip', 'missed')) AS skip_count,
+            ROUND(AVG(c.sleepiness_level)::numeric, 2) AS avg_sleepiness,
+            ROUND(AVG(c.headache_level)::numeric, 2) AS avg_headache,
+            ROUND(AVG(c.nausea_level)::numeric, 2) AS avg_nausea,
+            ROUND(AVG(c.vomit_feeling_level)::numeric, 2) AS avg_vomit_feeling
+        FROM medicines m
+        LEFT JOIN medicine_logs l
+            ON m.id = l.medicine_id
+           AND l.log_date >= %s
+           AND l.status IN ('skip', 'missed')
+        LEFT JOIN body_condition_logs c
+            ON DATE(c.logged_at) = l.log_date
+        GROUP BY m.id, m.name
+        ORDER BY skip_count DESC, m.name
+    """, (start_date,))
+
+    trigger_vomit = query_all("""
+        SELECT
+            COALESCE(NULLIF(trigger, ''), '未入力') AS trigger,
+            COUNT(*) AS count
+        FROM vomit_logs
+        WHERE DATE(vomited_at) >= %s
+        GROUP BY COALESCE(NULLIF(trigger, ''), '未入力')
+        ORDER BY count DESC
+        LIMIT 10
+    """, (start_date,))
+
+    food_vomit = query_all("""
+        SELECT
+            COALESCE(NULLIF(food, ''), '未入力') AS food,
+            COUNT(*) AS count
+        FROM vomit_logs
+        WHERE DATE(vomited_at) >= %s
+        GROUP BY COALESCE(NULLIF(food, ''), '未入力')
+        ORDER BY count DESC
+        LIMIT 10
+    """, (start_date,))
+
+    daily_summary = query_all("""
+        WITH date_range AS (
+            SELECT generate_series(%s::date, CURRENT_DATE, interval '1 day')::date AS d
+        ),
+        vomit_daily AS (
+            SELECT DATE(vomited_at) AS d, COUNT(*) AS vomit_count
+            FROM vomit_logs
+            WHERE DATE(vomited_at) >= %s
+            GROUP BY DATE(vomited_at)
+        ),
+        sleep_daily AS (
+            SELECT DATE(slept_at) AS d, COUNT(*) AS work_sleep_count
+            FROM work_sleep_logs
+            WHERE DATE(slept_at) >= %s
+            GROUP BY DATE(slept_at)
+        ),
+        diary_daily AS (
+            SELECT log_date AS d, MIN(heart_score) AS min_heart_score
+            FROM diary_logs
+            WHERE log_date >= %s
+            GROUP BY log_date
+        ),
+        condition_daily AS (
+            SELECT
+                DATE(logged_at) AS d,
+                MAX(sleepiness_level) AS max_sleepiness,
+                MAX(headache_level) AS max_headache,
+                MAX(nausea_level) AS max_nausea,
+                MAX(vomit_feeling_level) AS max_vomit_feeling
+            FROM body_condition_logs
+            WHERE DATE(logged_at) >= %s
+            GROUP BY DATE(logged_at)
+        ),
+        weather_daily AS (
+            SELECT
+                DATE(logged_at) AS d,
+                MAX(weather_code) AS max_pressure_level
+            FROM weather_logs
+            WHERE DATE(logged_at) >= %s
+            GROUP BY DATE(logged_at)
+        )
+        SELECT
+            dr.d,
+            COALESCE(v.vomit_count, 0) AS vomit_count,
+            COALESCE(s.work_sleep_count, 0) AS work_sleep_count,
+            dd.min_heart_score,
+            c.max_sleepiness,
+            c.max_headache,
+            c.max_nausea,
+            c.max_vomit_feeling,
+            w.max_pressure_level
+        FROM date_range dr
+        LEFT JOIN vomit_daily v ON dr.d = v.d
+        LEFT JOIN sleep_daily s ON dr.d = s.d
+        LEFT JOIN diary_daily dd ON dr.d = dd.d
+        LEFT JOIN condition_daily c ON dr.d = c.d
+        LEFT JOIN weather_daily w ON dr.d = w.d
+        ORDER BY dr.d DESC
+        LIMIT 14
+    """, (start_date, start_date, start_date, start_date, start_date, start_date))
+
+    total_days = query_one("""
+        SELECT COUNT(*) AS count
+        FROM generate_series(%s::date, CURRENT_DATE, interval '1 day')
+    """, (start_date,))["count"]
+
+    return render_template(
+        "analysis.html",
+        days=days,
+        start_date=start_date,
+        pressure_condition=pressure_condition,
+        low_heart_days=low_heart_days,
+        cycle_vomit=cycle_vomit,
+        non_cycle_vomit=non_cycle_vomit,
+        medicine_skip_condition=medicine_skip_condition,
+        trigger_vomit=trigger_vomit,
+        food_vomit=food_vomit,
+        daily_summary=daily_summary,
+        total_days=total_days,
+        pressure_level_map=PRESSURE_LEVEL,
+    )
 
 
 # =========================
