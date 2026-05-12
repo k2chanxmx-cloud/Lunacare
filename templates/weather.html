@@ -1,125 +1,231 @@
 {% extends "base.html" %}
 
-{% block title %}気圧ログ | LunaCare{% endblock %}
+{% block title %}気圧・天気 | LunaCare{% endblock %}
 
 {% block content %}
 
 <div class="page-title">
-  <h1>☁️ 気圧ログ</h1>
+  <h1>☁️ 気圧・天気</h1>
   <p>
-    気圧の現在値・3時間変化・6時間変化を確認します。<br>
-    眠気・頭痛・嘔吐との関連を見るための画面です。
+    気圧と体調の関係を確認できます。<br>
+    眠気・頭痛・吐き気の参考用です。
   </p>
 </div>
 
-<div class="card">
-  <div class="alert-title" style="font-size:18px;">
-    ☁️ 最新の気圧
-  </div>
+{% if latest %}
 
-  {% if latest %}
+  {% set level = latest.weather_code|string if latest.weather_code is not none else "0" %}
+  {% set level_label = pressure_level_map.get(level, "通常") %}
+
+  <div class="card">
+
+    <div class="alert-title" style="font-size:18px; margin-bottom:12px;">
+      ☁️ 現在の気圧
+    </div>
+
     <div class="grid">
+
       <div class="stat">
-        <div class="stat-label">気圧</div>
+        <div class="stat-label">現在気圧</div>
+
         <div class="stat-value">
           {{ latest.pressure_msl }}<span class="small"> hPa</span>
         </div>
       </div>
 
       <div class="stat">
-        <div class="stat-label">気温</div>
-        <div class="stat-value">
-          {{ latest.temperature }}<span class="small"> ℃</span>
-        </div>
-      </div>
+        <div class="stat-label">気圧レベル</div>
 
-      <div class="stat">
-        <div class="stat-label">3時間変化</div>
         <div class="stat-value
-          {% if latest.pressure_change_3h is not none and latest.pressure_change_3h <= -3 %}
+          {% if level|int >= 4 %}
             danger-text
-          {% elif latest.pressure_change_3h is not none and latest.pressure_change_3h <= -1.5 %}
+          {% elif level|int >= 3 %}
             warning-text
           {% endif %}
         ">
-          {% if latest.pressure_change_3h is not none %}
-            {{ latest.pressure_change_3h }}
-          {% else %}
-            --
-          {% endif %}
+          {{ level_label }}
         </div>
       </div>
 
-      <div class="stat">
-        <div class="stat-label">6時間変化</div>
-        <div class="stat-value
-          {% if latest.pressure_change_6h is not none and latest.pressure_change_6h <= -5 %}
-            danger-text
-          {% elif latest.pressure_change_6h is not none and latest.pressure_change_6h <= -3 %}
-            warning-text
-          {% endif %}
-        ">
-          {% if latest.pressure_change_6h is not none %}
-            {{ latest.pressure_change_6h }}
-          {% else %}
-            --
-          {% endif %}
-        </div>
-      </div>
     </div>
 
+    <div class="card-soft" style="margin-top:12px;">
+
+      {% if latest.temperature %}
+        <div class="small muted">
+          気温：{{ latest.temperature }}℃
+        </div>
+      {% endif %}
+
+      <div class="small muted" style="margin-top:4px;">
+        更新：
+        {{ latest.logged_at.strftime("%Y/%m/%d %H:%M") }}
+      </div>
+
+    </div>
+
+    <div style="margin-top:16px;">
+
+      {% if level|int >= 4 %}
+
+        <div class="alert danger">
+          <div class="alert-title">
+            ⚠️ 気圧警戒
+          </div>
+
+          <div class="small muted">
+            強めの気圧変化です。<br>
+            眠気・頭痛・吐き気・だるさに注意してください。
+          </div>
+        </div>
+
+      {% elif level|int >= 3 %}
+
+        <div class="alert warning">
+          <div class="alert-title">
+            ☁️ 気圧注意
+          </div>
+
+          <div class="small muted">
+            少し強めの気圧変化があります。<br>
+            無理せず過ごす推奨日です。
+          </div>
+        </div>
+
+      {% elif level|int >= 2 %}
+
+        <div class="alert warning">
+          <div class="alert-title">
+            🌥 やや注意
+          </div>
+
+          <div class="small muted">
+            軽めの気圧変化があります。<br>
+            眠気や集中力低下に注意してください。
+          </div>
+        </div>
+
+      {% else %}
+
+        <div class="alert success">
+          <div class="alert-title">
+            ☀️ 比較的安定
+          </div>
+
+          <div class="small muted">
+            今のところ大きな気圧変化は少なそうです。
+          </div>
+        </div>
+
+      {% endif %}
+
+    </div>
+
+  </div>
+
+{% else %}
+
+  <div class="card">
+
     <div class="card-soft">
+
       <div class="small muted">
-        最終更新：{{ latest.logged_at.strftime("%Y/%m/%d %H:%M") }}
+        まだ気圧データがありません。
       </div>
-    </div>
-  {% else %}
-    <div class="card-soft">
-      <div class="muted small">
-        まだ気圧データがありません。<br>
-        <code>/weather/update</code> を開くと取得できます。
+
+      <div style="margin-top:12px;">
+        <a class="btn" href="{{ url_for('weather_update') }}">
+          ☁️ 気圧を取得する
+        </a>
       </div>
+
     </div>
-  {% endif %}
-</div>
+
+  </div>
+
+{% endif %}
 
 <div class="card">
-  <div class="alert-title" style="font-size:18px;">
-    📋 最近の気圧ログ
+
+  <div class="alert-title" style="font-size:18px; margin-bottom:12px;">
+    📋 最近の気圧履歴
   </div>
 
   {% if logs %}
+
     <div class="log-list">
+
       {% for log in logs %}
+
+        {% set row_level = log.weather_code|string if log.weather_code is not none else "0" %}
+        {% set row_label = pressure_level_map.get(row_level, "通常") %}
+
         <div class="log-item">
+
           <div class="log-head">
-            <div>☁️ {{ log.pressure_msl }} hPa</div>
-            <div class="small muted">
-              {{ log.logged_at.strftime("%m/%d %H:%M") }}
+
+            <div>
+              ☁️ {{ row_label }}
             </div>
+
+            <div class="small muted">
+              {{ log.logged_at.strftime("%Y/%m/%d %H:%M") }}
+            </div>
+
           </div>
 
-          <div style="display:flex; flex-wrap:wrap; gap:8px;">
-            <span class="pill">🌡 {{ log.temperature }}℃</span>
+          <div class="grid">
 
-            {% if log.pressure_change_3h is not none %}
-              <span class="pill">3h {{ log.pressure_change_3h }} hPa</span>
-            {% endif %}
+            <div class="stat">
+              <div class="stat-label">気圧</div>
 
-            {% if log.pressure_change_6h is not none %}
-              <span class="pill">6h {{ log.pressure_change_6h }} hPa</span>
-            {% endif %}
+              <div class="stat-value">
+                {{ log.pressure_msl or "-" }}
+              </div>
+            </div>
+
+            <div class="stat">
+              <div class="stat-label">気温</div>
+
+              <div class="stat-value">
+                {% if log.temperature %}
+                  {{ log.temperature }}℃
+                {% else %}
+                  -
+                {% endif %}
+              </div>
+            </div>
+
           </div>
+
         </div>
+
       {% endfor %}
+
     </div>
+
   {% else %}
+
     <div class="card-soft">
-      <div class="muted small">
-        まだログがありません。
+      <div class="small muted">
+        気圧履歴はまだありません。
       </div>
     </div>
+
   {% endif %}
+
+</div>
+
+<div class="btn-row">
+
+  <a class="btn btn-sub" href="{{ url_for('index') }}">
+    ← ホームへ
+  </a>
+
+  <a class="btn" href="{{ url_for('weather_update') }}">
+    ☁️ 更新
+  </a>
+
 </div>
 
 {% endblock %}
