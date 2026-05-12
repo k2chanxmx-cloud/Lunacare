@@ -1,7 +1,7 @@
 import os
 import json
 import requests
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 
 import psycopg2
 import psycopg2.extras
@@ -18,14 +18,29 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-LATITUDE = float(os.environ.get("LATITUDE", "35.681236"))
-LONGITUDE = float(os.environ.get("LONGITUDE", "139.767125"))
-TIMEZONE = os.environ.get("TIMEZONE", "Asia/Tokyo")
+JST = timezone(timedelta(hours=9))
+
+# Zutool 気圧API用
+KIATSU_AREA_CODE = os.environ.get("KIATSU_AREA_CODE", "13108")  # 江東区
+KIATSU_AREA_NAME = os.environ.get("KIATSU_AREA_NAME", "東京・江東区")
+
+
+PRESSURE_LEVEL = {
+    "0": "通常",
+    "1": "通常",
+    "2": "やや注意",
+    "3": "注意",
+    "4": "警戒",
+}
+
+
+def now_jst():
+    return datetime.now(JST)
 
 
 @app.context_processor
 def inject_now():
-    return {"now": datetime.now}
+    return {"now": lambda: now_jst().replace(tzinfo=None)}
 
 
 # =========================
@@ -73,7 +88,7 @@ def execute(sql, params=None):
 # 共通
 # =========================
 def today_str():
-    return date.today().isoformat()
+    return now_jst().date().isoformat()
 
 
 def calc_heart_display(score):
@@ -94,68 +109,95 @@ def safe_int(value):
         return None
 
 
-# =========================
-# 気圧取得
-# =========================
-def fetch_weather_from_open_meteo():
-    url = "https://api.open-meteo.com/v1/forecast"
+def safe_float(value):
+    try:
+        if value in ("", None, "-"):
+            return None
+        return float(value)
+    except Exception:
+        return None
 
-    params = {
-        "latitude": LATITUDE,
-        "longitude": LONGITUDE,
-        "hourly": "pressure_msl,surface_pressure,temperature_2m,weather_code",
-        "forecast_days": 1,
-        "past_days": 1,
-        "timezone": TIMEZONE,
-    }
 
-    res = requests.get(url, params=params, timeout=8)
+# =========================
+# 気圧取得：Zutool API版
+# =========================
+def fetch_kiatsu_from_zutool():
+    api_url = f"https://zutool.jp/api/getweatherstatus/{KIATSU_AREA_CODE}"
+
+    res = requests.get(api_url, timeout=8)
     res.raise_for_status()
-    data = res.json()
+    return res.json()
 
-    hourly = data.get("hourly", {})
-    times = hourly.get("time", [])
-    pressure_msl = hourly.get("pressure_msl", [])
-    surface_pressure = hourly.get("surface_pressure", [])
-    temperature = hourly.get("temperature_2m", [])
-    weather_code = hourly.get("weather_code", [])
 
-    if not times:
-        raise RuntimeError("Open-Meteoから気圧データを取得できませんでした")
+def pick_current_kiatsu_item(data):
+    today_items = data.get("today", [])
+    tomorrow_items = data.get("tommorow", data.get("tomorrow", []))
 
-    now_dt = datetime.now()
-    best_index = 0
-    best_diff = None
+    now = now_jst()
+    now_hour = now.hour
 
-    for i, t in enumerate(times):
-        dt = datetime.fromisoformat(t)
-        diff = abs((dt - now_dt).total_seconds())
+    candidates = []
 
-        if best_diff is None or diff < best_diff:
-            best_diff = diff
-            best_index = i
+    for item in today_items:
+        try:
+            hour = int(item.get("time", 0))
+            diff = abs(hour - now_hour)
+            candidates.append({
+                "date": now.date(),
+                "hour": hour,
+                "diff": diff,
+                "item": item
+            })
+        except Exception:
+            pass
 
-    logged_at = datetime.fromisoformat(times[best_index])
-    current_pressure = pressure_msl[best_index]
+    if not candidates and tomorrow_items:
+        tomorrow = now.date() + timedelta(days=1)
+        for item in tomorrow_items:
+            try:
+                hour = int(item.get("time", 0))
+                candidates.append({
+                    "date": tomorrow,
+                    "hour": hour,
+                    "diff": 999 + hour,
+                    "item": item
+                })
+            except Exception:
+                pass
 
-    pressure_3h = None
-    pressure_6h = None
+    if not candidates:
+        raise RuntimeError("Zutoolから気圧データを取得できませんでした")
 
-    if best_index >= 3:
-        pressure_3h = round(current_pressure - pressure_msl[best_index - 3], 2)
+    picked = sorted(candidates, key=lambda x: x["diff"])[0]
 
-    if best_index >= 6:
-        pressure_6h = round(current_pressure - pressure_msl[best_index - 6], 2)
+    logged_at = datetime.combine(
+        picked["date"],
+        datetime.min.time()
+    ).replace(hour=picked["hour"])
+
+    item = picked["item"]
+
+    pressure = safe_float(item.get("pressure"))
+    temp = safe_float(item.get("temp"))
+    level_code = str(item.get("pressure_level", "0"))
 
     return {
         "logged_at": logged_at,
-        "pressure_msl": current_pressure,
-        "surface_pressure": surface_pressure[best_index],
-        "pressure_change_3h": pressure_3h,
-        "pressure_change_6h": pressure_6h,
-        "temperature": temperature[best_index],
-        "weather_code": weather_code[best_index],
+        "pressure_msl": pressure,
+        "surface_pressure": pressure,
+        "pressure_change_3h": None,
+        "pressure_change_6h": None,
+        "temperature": temp,
+        "weather_code": safe_int(level_code),
+        "pressure_level": level_code,
+        "pressure_level_label": PRESSURE_LEVEL.get(level_code, "通常"),
+        "raw": item,
     }
+
+
+def fetch_weather_from_zutool():
+    data = fetch_kiatsu_from_zutool()
+    return pick_current_kiatsu_item(data)
 
 
 def save_weather_log(weather):
@@ -195,9 +237,14 @@ def save_weather_log(weather):
 @app.route("/weather/update")
 def weather_update():
     try:
-        weather_data = fetch_weather_from_open_meteo()
+        weather_data = fetch_weather_from_zutool()
         save_weather_log(weather_data)
-        return jsonify({"ok": True, "weather": weather_data})
+        return jsonify({
+            "ok": True,
+            "source": "zutool",
+            "area": KIATSU_AREA_NAME,
+            "weather": weather_data
+        })
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
@@ -225,7 +272,7 @@ def weather():
 # =========================
 @app.route("/")
 def index():
-    today = date.today()
+    today = now_jst().date()
 
     vomit_count = query_one("""
         SELECT COUNT(*) AS count
@@ -307,6 +354,7 @@ def index():
         medicines=medicines,
         med_status=med_status,
         alerts=alerts,
+        pressure_level_map=PRESSURE_LEVEL,
     )
 
 
@@ -316,7 +364,7 @@ def index():
 @app.route("/vomit", methods=["GET", "POST"])
 def vomit():
     if request.method == "POST":
-        vomited_at = request.form.get("vomited_at") or datetime.now().strftime("%Y-%m-%dT%H:%M")
+        vomited_at = request.form.get("vomited_at") or now_jst().replace(tzinfo=None).strftime("%Y-%m-%dT%H:%M")
         food = request.form.get("food", "")
         trigger = request.form.get("trigger", "")
         memo = request.form.get("memo", "")
@@ -348,7 +396,7 @@ def vomit_quick():
             (vomited_at, trigger, memo)
         VALUES
             (%s, %s, %s)
-    """, (datetime.now(), "未入力", ""))
+    """, (now_jst().replace(tzinfo=None), "未入力", ""))
 
     return redirect(url_for("index"))
 
@@ -378,7 +426,7 @@ def cycle_start():
                 (started_at, memo)
             VALUES
                 (%s, %s)
-        """, (datetime.now(), request.form.get("memo", "")))
+        """, (now_jst().replace(tzinfo=None), request.form.get("memo", "")))
 
     return redirect(url_for("index"))
 
@@ -389,7 +437,7 @@ def cycle_end():
         UPDATE cycle_modes
         SET ended_at = %s
         WHERE ended_at IS NULL
-    """, (datetime.now(),))
+    """, (now_jst().replace(tzinfo=None),))
 
     return redirect(url_for("index"))
 
@@ -447,7 +495,7 @@ def medicine_delete(medicine_id):
 @app.route("/medicine/taken/<int:medicine_id>", methods=["POST"])
 def medicine_taken(medicine_id):
     status = request.form.get("status", "taken")
-    log_date = date.today()
+    log_date = now_jst().date()
 
     execute("""
         INSERT INTO medicine_logs
@@ -463,7 +511,7 @@ def medicine_taken(medicine_id):
         medicine_id,
         log_date,
         status,
-        datetime.now() if status == "taken" else None,
+        now_jst().replace(tzinfo=None) if status == "taken" else None,
         request.form.get("memo", "")
     ))
 
@@ -517,7 +565,7 @@ def diary_delete(log_id):
 @app.route("/condition", methods=["GET", "POST"])
 def condition():
     if request.method == "POST":
-        logged_at = request.form.get("logged_at") or datetime.now().strftime("%Y-%m-%dT%H:%M")
+        logged_at = request.form.get("logged_at") or now_jst().replace(tzinfo=None).strftime("%Y-%m-%dT%H:%M")
 
         sleepiness_level = safe_int(request.form.get("sleepiness_level"))
         headache_level = safe_int(request.form.get("headache_level"))
@@ -568,7 +616,8 @@ def condition():
             w.pressure_msl,
             w.pressure_change_3h,
             w.pressure_change_6h,
-            w.temperature
+            w.temperature,
+            w.weather_code
         FROM body_condition_logs c
         LEFT JOIN weather_logs w
             ON c.weather_log_id = w.id
@@ -588,6 +637,7 @@ def condition():
         logs=logs,
         today=today_str(),
         latest_weather=latest_weather,
+        pressure_level_map=PRESSURE_LEVEL,
     )
 
 
@@ -604,7 +654,7 @@ def condition_delete(log_id):
 @app.route("/work-sleep", methods=["GET", "POST"])
 def work_sleep():
     if request.method == "POST":
-        slept_at = request.form.get("slept_at") or datetime.now().strftime("%Y-%m-%dT%H:%M")
+        slept_at = request.form.get("slept_at") or now_jst().replace(tzinfo=None).strftime("%Y-%m-%dT%H:%M")
         duration_minutes = request.form.get("duration_minutes") or None
         trigger = request.form.get("trigger", "")
         escape_reason = request.form.get("escape_reason", "")
@@ -645,7 +695,7 @@ def work_sleep_quick():
             (slept_at, trigger, escape_reason, workload_level, memo)
         VALUES
             (%s, %s, %s, %s, %s)
-    """, (datetime.now(), "未入力", "", "", ""))
+    """, (now_jst().replace(tzinfo=None), "未入力", "", "", ""))
 
     return redirect(url_for("index"))
 
@@ -661,7 +711,7 @@ def work_sleep_delete(log_id):
 # アラート判定
 # =========================
 def check_alerts():
-    today = date.today()
+    today = now_jst().date()
 
     vomit_count = query_one("""
         SELECT COUNT(*) AS count
@@ -765,21 +815,32 @@ def check_alerts():
         })
 
     if latest_weather:
-        change_3h = latest_weather.get("pressure_change_3h")
-        change_6h = latest_weather.get("pressure_change_6h")
+        level = latest_weather.get("weather_code")
 
-        if change_6h is not None and change_6h <= -5:
-            alerts.append({
-                "level": "danger",
-                "title": "気圧が大きく下がっています",
-                "message": f"6時間で{change_6h}hPa変化しています。眠気・頭痛・嘔吐に注意してください。"
-            })
-        elif change_3h is not None and change_3h <= -3:
-            alerts.append({
-                "level": "warning",
-                "title": "気圧低下に注意",
-                "message": f"3時間で{change_3h}hPa変化しています。無理せず様子見推奨です。"
-            })
+        if level is not None:
+            try:
+                level = int(level)
+            except Exception:
+                level = 0
+
+            if level >= 4:
+                alerts.append({
+                    "level": "danger",
+                    "title": "気圧が警戒レベルです",
+                    "message": "気圧レベルが警戒です。眠気・頭痛・嘔吐に注意してください。"
+                })
+            elif level >= 3:
+                alerts.append({
+                    "level": "warning",
+                    "title": "気圧が注意レベルです",
+                    "message": "気圧レベルが注意です。無理せず様子見推奨です。"
+                })
+            elif level >= 2:
+                alerts.append({
+                    "level": "warning",
+                    "title": "気圧がやや注意です",
+                    "message": "少し気圧変化があります。眠気・頭痛に注意してください。"
+                })
 
     if today_condition_max:
         max_sleepiness = today_condition_max.get("max_sleepiness") or 0
@@ -809,14 +870,12 @@ def check_alerts():
             })
 
         if latest_weather:
-            change_3h = latest_weather.get("pressure_change_3h")
-            change_6h = latest_weather.get("pressure_change_6h")
-            pressure_drop = (
-                (change_3h is not None and change_3h <= -3)
-                or (change_6h is not None and change_6h <= -5)
-            )
+            try:
+                pressure_level = int(latest_weather.get("weather_code") or 0)
+            except Exception:
+                pressure_level = 0
 
-            if pressure_drop and (
+            if pressure_level >= 3 and (
                 max_sleepiness >= 4
                 or max_headache >= 4
                 or max_nausea >= 4
@@ -824,8 +883,8 @@ def check_alerts():
             ):
                 alerts.append({
                     "level": "danger",
-                    "title": "気圧低下＋体調悪化サイン",
-                    "message": "気圧低下と体調悪化が同時に出ています。今日は無理しない優先日にしてください。"
+                    "title": "気圧注意＋体調悪化サイン",
+                    "message": "気圧注意と体調悪化が同時に出ています。今日は無理しない優先日にしてください。"
                 })
 
     return alerts
@@ -842,7 +901,7 @@ def api_alerts():
 @app.route("/report")
 def report():
     days = int(request.args.get("days", 30))
-    start_date = date.today() - timedelta(days=days - 1)
+    start_date = now_jst().date() - timedelta(days=days - 1)
 
     vomit_summary = query_one("""
         SELECT COUNT(*) AS total
@@ -914,7 +973,8 @@ def report():
             c.*,
             w.pressure_msl,
             w.pressure_change_3h,
-            w.pressure_change_6h
+            w.pressure_change_6h,
+            w.weather_code
         FROM body_condition_logs c
         LEFT JOIN weather_logs w
             ON c.weather_log_id = w.id
@@ -938,6 +998,7 @@ def report():
         recent_vomits=recent_vomits,
         recent_diaries=recent_diaries,
         recent_conditions=recent_conditions,
+        pressure_level_map=PRESSURE_LEVEL,
     )
 
 
@@ -973,7 +1034,7 @@ def notification_check():
     weather_error = None
 
     try:
-        weather_data = fetch_weather_from_open_meteo()
+        weather_data = fetch_weather_from_zutool()
         save_weather_log(weather_data)
         weather_result = weather_data
     except Exception as e:
@@ -1012,4 +1073,5 @@ def health():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
