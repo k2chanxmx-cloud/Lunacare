@@ -27,31 +27,21 @@
     </div>
 
     <div class="stat">
-      <div class="stat-label">3時間変化</div>
-      <div class="stat-value
-        {% if latest_weather.pressure_change_3h is not none and latest_weather.pressure_change_3h <= -3 %}
-          danger-text
-        {% elif latest_weather.pressure_change_3h is not none and latest_weather.pressure_change_3h <= -1.5 %}
-          warning-text
-        {% endif %}
-      ">
-        {% if latest_weather.pressure_change_3h is not none %}
-          {{ latest_weather.pressure_change_3h }}
+      <div class="stat-label">気圧レベル</div>
+      <div class="stat-value">
+        {% if latest_weather.weather_code is not none %}
+          {{ pressure_level_map.get(latest_weather.weather_code|string, "通常") }}
         {% else %}
-          --
+          -
         {% endif %}
       </div>
     </div>
   </div>
 
   <div class="card-soft" style="margin-top:12px;">
-    <div class="small muted">
-      温度：{{ latest_weather.temperature }}℃
-    </div>
-
-    {% if latest_weather.pressure_change_6h is not none %}
-      <div class="small muted" style="margin-top:4px;">
-        6時間変化：{{ latest_weather.pressure_change_6h }} hPa
+    {% if latest_weather.temperature %}
+      <div class="small muted">
+        温度：{{ latest_weather.temperature }}℃
       </div>
     {% endif %}
 
@@ -78,52 +68,65 @@
       >
     </div>
 
+    <input type="hidden" name="sleepiness_level" id="sleepiness_level" value="">
+    <input type="hidden" name="headache_level" id="headache_level" value="">
+    <input type="hidden" name="nausea_level" id="nausea_level" value="">
+    <input type="hidden" name="vomit_feeling_level" id="vomit_feeling_level" value="">
+
     <div class="form-row">
       <label>眠気レベル</label>
-      <select name="sleepiness_level">
-        <option value="">選択してください</option>
-        <option value="1">1 - 少ない</option>
-        <option value="2">2</option>
-        <option value="3">3 - 普通</option>
-        <option value="4">4 - 強い</option>
-        <option value="5">5 - 限界</option>
-      </select>
+      <div class="level-wrap" data-target="sleepiness_level">
+        <span class="level-heart" data-score="1">♡</span>
+        <span class="level-heart" data-score="2">♡</span>
+        <span class="level-heart" data-score="3">♡</span>
+        <span class="level-heart" data-score="4">♡</span>
+        <span class="level-heart" data-score="5">♡</span>
+      </div>
+      <div class="level-label small muted" data-label="sleepiness_level">
+        未選択
+      </div>
     </div>
 
     <div class="form-row">
       <label>頭痛レベル</label>
-      <select name="headache_level">
-        <option value="">選択してください</option>
-        <option value="1">1 - 少ない</option>
-        <option value="2">2</option>
-        <option value="3">3 - 普通</option>
-        <option value="4">4 - 強い</option>
-        <option value="5">5 - 限界</option>
-      </select>
+      <div class="level-wrap" data-target="headache_level">
+        <span class="level-heart" data-score="1">♡</span>
+        <span class="level-heart" data-score="2">♡</span>
+        <span class="level-heart" data-score="3">♡</span>
+        <span class="level-heart" data-score="4">♡</span>
+        <span class="level-heart" data-score="5">♡</span>
+      </div>
+      <div class="level-label small muted" data-label="headache_level">
+        未選択
+      </div>
     </div>
 
     <div class="form-row">
       <label>吐き気レベル</label>
-      <select name="nausea_level">
-        <option value="">選択してください</option>
-        <option value="1">1 - 少ない</option>
-        <option value="2">2</option>
-        <option value="3">3 - 普通</option>
-        <option value="4">4 - 強い</option>
-        <option value="5">5 - 限界</option>
-      </select>
+      <div class="level-wrap" data-target="nausea_level">
+        <span class="level-heart" data-score="1">♡</span>
+        <span class="level-heart" data-score="2">♡</span>
+        <span class="level-heart" data-score="3">♡</span>
+        <span class="level-heart" data-score="4">♡</span>
+        <span class="level-heart" data-score="5">♡</span>
+      </div>
+      <div class="level-label small muted" data-label="nausea_level">
+        未選択
+      </div>
     </div>
 
     <div class="form-row">
       <label>嘔吐感レベル</label>
-      <select name="vomit_feeling_level">
-        <option value="">選択してください</option>
-        <option value="1">1 - 少ない</option>
-        <option value="2">2</option>
-        <option value="3">3 - 普通</option>
-        <option value="4">4 - 強い</option>
-        <option value="5">5 - 限界</option>
-      </select>
+      <div class="level-wrap" data-target="vomit_feeling_level">
+        <span class="level-heart" data-score="1">♡</span>
+        <span class="level-heart" data-score="2">♡</span>
+        <span class="level-heart" data-score="3">♡</span>
+        <span class="level-heart" data-score="4">♡</span>
+        <span class="level-heart" data-score="5">♡</span>
+      </div>
+      <div class="level-label small muted" data-label="vomit_feeling_level">
+        未選択
+      </div>
     </div>
 
     <div class="form-row">
@@ -182,12 +185,10 @@
             <div style="margin-top:10px;">
               <span class="pill">☁️ {{ log.pressure_msl }} hPa</span>
 
-              {% if log.pressure_change_3h is not none %}
-                <span class="pill">3h {{ log.pressure_change_3h }}</span>
-              {% endif %}
-
-              {% if log.pressure_change_6h is not none %}
-                <span class="pill">6h {{ log.pressure_change_6h }}</span>
+              {% if log.weather_code is not none %}
+                <span class="pill">
+                  {{ pressure_level_map.get(log.weather_code|string, "通常") }}
+                </span>
               {% endif %}
             </div>
           {% endif %}
@@ -220,4 +221,101 @@
   {% endif %}
 </div>
 
+{% endblock %}
+
+{% block head %}
+<style>
+  .level-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 24px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--line);
+  }
+
+  .level-heart {
+    font-size: 38px;
+    cursor: pointer;
+    user-select: none;
+    color: rgba(255,255,255,0.28);
+    transition:
+      transform 0.12s ease,
+      color 0.12s ease,
+      text-shadow 0.12s ease;
+  }
+
+  .level-heart.active {
+    color: var(--pink2);
+    text-shadow:
+      0 0 10px rgba(255,79,216,0.4),
+      0 0 24px rgba(255,79,216,0.25);
+  }
+
+  .level-heart:hover {
+    transform: scale(1.12);
+  }
+
+  .level-heart:active {
+    transform: scale(0.88);
+  }
+
+  .level-label {
+    margin-top: 8px;
+  }
+
+  @media (max-width: 430px) {
+    .level-heart {
+      font-size: 32px;
+    }
+
+    .level-wrap {
+      gap: 9px;
+      padding: 14px;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function updateLevel(targetName, score) {
+    const input = document.getElementById(targetName);
+    const label = document.querySelector(`[data-label="${targetName}"]`);
+    const wrap = document.querySelector(`.level-wrap[data-target="${targetName}"]`);
+    const hearts = wrap.querySelectorAll(".level-heart");
+
+    input.value = score;
+
+    let display = "";
+
+    hearts.forEach((heart) => {
+      const heartScore = Number(heart.dataset.score);
+
+      if (heartScore <= score) {
+        heart.textContent = "♥";
+        heart.classList.add("active");
+        display += "♥";
+      } else {
+        heart.textContent = "♡";
+        heart.classList.remove("active");
+        display += "♡";
+      }
+    });
+
+    label.textContent = display + " / " + score;
+  }
+
+  document.querySelectorAll(".level-wrap").forEach((wrap) => {
+    const targetName = wrap.dataset.target;
+
+    wrap.querySelectorAll(".level-heart").forEach((heart) => {
+      heart.addEventListener("click", function () {
+        updateLevel(targetName, Number(this.dataset.score));
+      });
+    });
+  });
+</script>
 {% endblock %}
