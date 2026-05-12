@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block title %}ホーム | LunaCare{% endblock %}
+
+{% block content %}
+
+<div class="page-title">
+  <h1>今日の状態</h1>
+  <p>嘔吐・薬・こころ・気圧をまとめて確認します。</p>
+</div>
+
+{% if alerts %}
+  <div class="card">
+    <div class="alert-title" style="font-size:18px; margin-bottom:10px;">
+      ⚠️ 今日のアラート
+    </div>
+
+    {% for alert in alerts %}
+      <div class="alert {{ alert.level }}">
+        <div class="alert-title">{{ alert.title }}</div>
+        <div class="small muted">{{ alert.message }}</div>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<div class="grid">
+  <div class="stat">
+    <div class="stat-label">今日の嘔吐</div>
+    <div class="stat-value">{{ vomit_count }}回</div>
+  </div>
+
+  <div class="stat">
+    <div class="stat-label">仕事中睡眠</div>
+    <div class="stat-value">{{ sleep_count }}回</div>
+  </div>
+
+  <div class="stat">
+    <div class="stat-label">こころ</div>
+    <div class="stat-value" style="font-size:22px; color:var(--pink2);">
+      {{ heart_display }}
+    </div>
+  </div>
+
+  <div class="stat">
+    <div class="stat-label">生理前モード</div>
+    <div class="stat-value" style="font-size:20px;">
+      {% if active_cycle %}
+        ON
+      {% else %}
+        OFF
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="alert-title" style="font-size:18px; margin-bottom:10px;">
+    ☁️ 気圧・体調
+  </div>
+
+  {% if weather_latest %}
+    <div class="grid">
+      <div class="stat">
+        <div class="stat-label">現在の気圧</div>
+        <div class="stat-value">
+          {{ weather_latest.pressure_msl }}<span class="small"> hPa</span>
+        </div>
+      </div>
+
+      <div class="stat">
+        <div class="stat-label">3時間変化</div>
+        <div class="stat-value
+          {% if weather_latest.pressure_change_3h is not none and weather_latest.pressure_change_3h <= -3 %}
+            danger-text
+          {% elif weather_latest.pressure_change_3h is not none and weather_latest.pressure_change_3h <= -1.5 %}
+            warning-text
+          {% endif %}
+        ">
+          {% if weather_latest.pressure_change_3h is not none %}
+            {{ weather_latest.pressure_change_3h }}<span class="small"> hPa</span>
+          {% else %}
+            --
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card-soft">
+      <div class="small muted">
+        最終更新：
+        {{ weather_latest.logged_at.strftime("%Y/%m/%d %H:%M") if weather_latest.logged_at else "" }}
+      </div>
+
+      {% if weather_latest.pressure_change_6h is not none %}
+        <div class="small muted" style="margin-top:4px;">
+          6時間変化：{{ weather_latest.pressure_change_6h }} hPa
+        </div>
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="card-soft">
+      <div class="muted small">
+        まだ気圧データがありません。<br>
+        Render公開後に <code>/weather/update</code> を開くと取得できます。
+      </div>
+    </div>
+  {% endif %}
+
+  {% if condition %}
+    <div class="grid" style="margin-top:10px;">
+      <div class="stat">
+        <div class="stat-label">眠気</div>
+        <div class="stat-value">{{ condition.sleepiness_level or "-" }}/5</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">頭痛</div>
+        <div class="stat-value">{{ condition.headache_level or "-" }}/5</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">吐き気</div>
+        <div class="stat-value">{{ condition.nausea_level or "-" }}/5</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">嘔吐感</div>
+        <div class="stat-value">{{ condition.vomit_feeling_level or "-" }}/5</div>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="btn-row" style="margin-top:12px;">
+    <a class="btn btn-sub" href="{{ url_for('condition') }}">体調を記録</a>
+    <a class="btn btn-sub" href="{{ url_for('weather') }}">気圧を見る</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="alert-title" style="font-size:18px; margin-bottom:10px;">
+    ⚡ 即記録
+  </div>
+
+  <form method="POST" action="{{ url_for('vomit_quick') }}" style="margin-bottom:10px;">
+    <button class="btn" type="submit">🫧 嘔吐した</button>
+  </form>
+
+  <form method="POST" action="{{ url_for('work_sleep_quick') }}" style="margin-bottom:10px;">
+    <button class="btn btn-sub" type="submit">😴 仕事中に寝た</button>
+  </form>
+
+  {% if active_cycle %}
+    <form method="POST" action="{{ url_for('cycle_end') }}">
+      <button class="btn btn-sub" type="submit">🌙 生理前モードをOFF</button>
+    </form>
+  {% else %}
+    <form method="POST" action="{{ url_for('cycle_start') }}">
+      <button class="btn btn-sub" type="submit">🌙 生理前モードをON</button>
+    </form>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="alert-title" style="font-size:18px; margin-bottom:10px;">
+    💊 今日の薬
+  </div>
+
+  {% if medicines %}
+    <div class="log-list">
+      {% for med in medicines %}
+        <div class="log-item">
+          <div class="log-head">
+            <div>
+              {{ med.name }}
+              {% if med.dose %}
+                <span class="muted small"> / {{ med.dose }}</span>
+              {% endif %}
+            </div>
+
+            <div class="small muted">
+              {% if med.take_time %}
+                {{ med.take_time.strftime("%H:%M") if med.take_time.__class__.__name__ != 'str' else med.take_time }}
+              {% else %}
+                時間未設定
+              {% endif %}
+            </div>
+          </div>
+
+          {% if med.timing_label %}
+            <div class="small muted" style="margin-bottom:8px;">
+              {{ med.timing_label }}
+            </div>
+          {% endif %}
+
+          {% set status = med_status.get(med.id) %}
+
+          {% if status == "taken" %}
+            <div class="pill" style="color:white; border-color:rgba(255,79,216,0.5);">
+              ✓ 服用済み
+            </div>
+          {% elif status in ["skip", "missed"] %}
+            <div class="pill danger-text">
+              未服用
+            </div>
+          {% else %}
+            <div class="btn-row">
+              <form method="POST" action="{{ url_for('medicine_taken', medicine_id=med.id) }}" style="flex:1;">
+                <input type="hidden" name="status" value="taken">
+                <button class="btn" type="submit">飲んだ</button>
+              </form>
+
+              <form method="POST" action="{{ url_for('medicine_taken', medicine_id=med.id) }}" style="flex:1;">
+                <input type="hidden" name="status" value="skip">
+                <button class="btn btn-sub" type="submit">スキップ</button>
+              </form>
+            </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card-soft">
+      <div class="muted small">
+        まだ薬が登録されていません。<br>
+        下の「薬」タブから薬マスタを登録してください。
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="alert-title" style="font-size:18px; margin-bottom:10px;">
+    📝 今日のメモ
+  </div>
+
+  {% if diary %}
+    <div class="card-soft">
+      <div style="font-size:24px; color:var(--pink2); font-weight:900;">
+        {{ heart_display }}
+      </div>
+
+      {% if diary.mood_tag %}
+        <div class="pill" style="margin-top:8px;">{{ diary.mood_tag }}</div>
+      {% endif %}
+
+      {% if diary.memo %}
+        <div style="margin-top:10px; line-height:1.7;">
+          {{ diary.memo }}
+        </div>
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="card-soft">
+      <div class="muted small">
+        まだ今日のこころログがありません。
+      </div>
+    </div>
+  {% endif %}
+
+  <a class="btn btn-sub" href="{{ url_for('diary') }}" style="margin-top:10px;">
+    こころログを書く
+  </a>
+</div>
+
+{% endblock %}

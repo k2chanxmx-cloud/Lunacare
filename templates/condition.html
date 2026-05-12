@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}体調ログ | LunaCare{% endblock %}
+
+{% block content %}
+
+<div class="page-title">
+  <h1>☁️ 体調ログ</h1>
+  <p>
+    眠気・頭痛・吐き気・嘔吐感を、1日に何回でも記録できます。<br>
+    気圧との関連確認にも使えます。
+  </p>
+</div>
+
+{% if latest_weather %}
+<div class="card">
+  <div class="alert-title" style="font-size:18px;">
+    ☁️ 現在の気圧
+  </div>
+
+  <div class="grid">
+    <div class="stat">
+      <div class="stat-label">現在</div>
+      <div class="stat-value">
+        {{ latest_weather.pressure_msl }}<span class="small"> hPa</span>
+      </div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-label">3時間変化</div>
+      <div class="stat-value
+        {% if latest_weather.pressure_change_3h is not none and latest_weather.pressure_change_3h <= -3 %}
+          danger-text
+        {% elif latest_weather.pressure_change_3h is not none and latest_weather.pressure_change_3h <= -1.5 %}
+          warning-text
+        {% endif %}
+      ">
+        {% if latest_weather.pressure_change_3h is not none %}
+          {{ latest_weather.pressure_change_3h }}
+        {% else %}
+          --
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card-soft" style="margin-top:12px;">
+    <div class="small muted">
+      温度：{{ latest_weather.temperature }}℃
+    </div>
+
+    {% if latest_weather.pressure_change_6h is not none %}
+      <div class="small muted" style="margin-top:4px;">
+        6時間変化：{{ latest_weather.pressure_change_6h }} hPa
+      </div>
+    {% endif %}
+
+    <div class="small muted" style="margin-top:4px;">
+      最終更新：{{ latest_weather.logged_at.strftime("%Y/%m/%d %H:%M") }}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="alert-title" style="font-size:18px;">
+    📝 今の体調を記録
+  </div>
+
+  <form method="POST">
+
+    <div class="form-row">
+      <label>記録日時</label>
+      <input
+        type="datetime-local"
+        name="logged_at"
+        value="{{ now().strftime('%Y-%m-%dT%H:%M') }}"
+      >
+    </div>
+
+    <div class="form-row">
+      <label>眠気レベル</label>
+      <select name="sleepiness_level">
+        <option value="">選択してください</option>
+        <option value="1">1 - 少ない</option>
+        <option value="2">2</option>
+        <option value="3">3 - 普通</option>
+        <option value="4">4 - 強い</option>
+        <option value="5">5 - 限界</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label>頭痛レベル</label>
+      <select name="headache_level">
+        <option value="">選択してください</option>
+        <option value="1">1 - 少ない</option>
+        <option value="2">2</option>
+        <option value="3">3 - 普通</option>
+        <option value="4">4 - 強い</option>
+        <option value="5">5 - 限界</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label>吐き気レベル</label>
+      <select name="nausea_level">
+        <option value="">選択してください</option>
+        <option value="1">1 - 少ない</option>
+        <option value="2">2</option>
+        <option value="3">3 - 普通</option>
+        <option value="4">4 - 強い</option>
+        <option value="5">5 - 限界</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label>嘔吐感レベル</label>
+      <select name="vomit_feeling_level">
+        <option value="">選択してください</option>
+        <option value="1">1 - 少ない</option>
+        <option value="2">2</option>
+        <option value="3">3 - 普通</option>
+        <option value="4">4 - 強い</option>
+        <option value="5">5 - 限界</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label>メモ</label>
+      <textarea
+        name="memo"
+        placeholder="例：午前中は平気だったけど午後から眠気が強い / 気圧低下っぽい"
+      ></textarea>
+    </div>
+
+    <button class="btn" type="submit">
+      ☁️ 保存する
+    </button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="alert-title" style="font-size:18px;">
+    📋 最近の体調ログ
+  </div>
+
+  {% if logs %}
+    <div class="log-list">
+      {% for log in logs %}
+        <div class="log-item">
+          <div class="log-head">
+            <div>☁️ 体調ログ</div>
+            <div class="small muted">
+              {{ log.logged_at.strftime("%Y/%m/%d %H:%M") }}
+            </div>
+          </div>
+
+          <div class="grid">
+            <div class="stat">
+              <div class="stat-label">眠気</div>
+              <div class="stat-value">{{ log.sleepiness_level or "-" }}</div>
+            </div>
+
+            <div class="stat">
+              <div class="stat-label">頭痛</div>
+              <div class="stat-value">{{ log.headache_level or "-" }}</div>
+            </div>
+
+            <div class="stat">
+              <div class="stat-label">吐き気</div>
+              <div class="stat-value">{{ log.nausea_level or "-" }}</div>
+            </div>
+
+            <div class="stat">
+              <div class="stat-label">嘔吐感</div>
+              <div class="stat-value">{{ log.vomit_feeling_level or "-" }}</div>
+            </div>
+          </div>
+
+          {% if log.pressure_msl %}
+            <div style="margin-top:10px;">
+              <span class="pill">☁️ {{ log.pressure_msl }} hPa</span>
+
+              {% if log.pressure_change_3h is not none %}
+                <span class="pill">3h {{ log.pressure_change_3h }}</span>
+              {% endif %}
+
+              {% if log.pressure_change_6h is not none %}
+                <span class="pill">6h {{ log.pressure_change_6h }}</span>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          {% if log.memo %}
+            <div style="margin-top:12px; line-height:1.7;">
+              {{ log.memo }}
+            </div>
+          {% endif %}
+
+          <form
+            method="POST"
+            action="{{ url_for('condition_delete', log_id=log.id) }}"
+            style="margin-top:12px;"
+            onsubmit="return confirm('削除しますか？')"
+          >
+            <button class="btn btn-danger" type="submit">
+              削除
+            </button>
+          </form>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card-soft">
+      <div class="muted small">
+        まだ体調ログがありません。
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+{% endblock %}

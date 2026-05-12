@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}嘔吐ログ | LunaCare{% endblock %}
+
+{% block content %}
+
+<div class="page-title">
+  <h1>🫧 嘔吐ログ</h1>
+  <p>
+    嘔吐回数・食事・トリガーを記録します。<br>
+    生理前や気圧との関連確認にも使えます。
+  </p>
+</div>
+
+<div class="card">
+
+  <div class="alert-title" style="font-size:18px;">
+    今日の記録
+  </div>
+
+  <form method="POST">
+
+    <div class="form-row">
+      <label>日時</label>
+      <input
+        type="datetime-local"
+        name="vomited_at"
+        value="{{ now().strftime('%Y-%m-%dT%H:%M') if now else '' }}"
+      >
+    </div>
+
+    <div class="form-row">
+      <label>何を食べた？</label>
+      <input
+        type="text"
+        name="food"
+        placeholder="例：ラーメン / お菓子 / 未入力"
+      >
+    </div>
+
+    <div class="form-row">
+      <label>トリガー</label>
+
+      <select name="trigger">
+        <option value="">選択してください</option>
+        <option value="生理前">生理前</option>
+        <option value="ストレス">ストレス</option>
+        <option value="過食">過食</option>
+        <option value="外食">外食</option>
+        <option value="薬">薬</option>
+        <option value="気圧">気圧</option>
+        <option value="不安">不安</option>
+        <option value="不明">不明</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label>メモ</label>
+
+      <textarea
+        name="memo"
+        placeholder="例：朝からしんどかった / 気圧低かった / 生理前っぽい"
+      ></textarea>
+    </div>
+
+    <button class="btn" type="submit">
+      🫧 保存する
+    </button>
+
+  </form>
+</div>
+
+<div class="card">
+
+  <div class="alert-title" style="font-size:18px;">
+    ⚡ クイック記録
+  </div>
+
+  <form method="POST" action="{{ url_for('vomit_quick') }}">
+    <button class="btn btn-sub" type="submit">
+      1タップで記録
+    </button>
+  </form>
+
+</div>
+
+<div class="card">
+
+  <div class="alert-title" style="font-size:18px;">
+    📋 最近のログ
+  </div>
+
+  {% if logs %}
+
+    <div class="log-list">
+
+      {% for log in logs %}
+
+        <div class="log-item">
+
+          <div class="log-head">
+
+            <div>
+              🫧 嘔吐
+            </div>
+
+            <div class="small muted">
+              {{ log.vomited_at.strftime("%Y/%m/%d %H:%M") }}
+            </div>
+
+          </div>
+
+          {% if log.food %}
+            <div style="margin-bottom:8px;">
+              <span class="pill">
+                🍽 {{ log.food }}
+              </span>
+            </div>
+          {% endif %}
+
+          {% if log.trigger %}
+            <div style="margin-bottom:8px;">
+              <span class="pill">
+                ⚠ {{ log.trigger }}
+              </span>
+            </div>
+          {% endif %}
+
+          {% if log.memo %}
+            <div style="line-height:1.7;">
+              {{ log.memo }}
+            </div>
+          {% endif %}
+
+          <form
+            method="POST"
+            action="{{ url_for('delete_vomit', log_id=log.id) }}"
+            style="margin-top:12px;"
+            onsubmit="return confirm('削除しますか？')"
+          >
+            <button class="btn btn-danger" type="submit">
+              削除
+            </button>
+          </form>
+
+        </div>
+
+      {% endfor %}
+
+    </div>
+
+  {% else %}
+
+    <div class="card-soft">
+      <div class="muted small">
+        まだログがありません。
+      </div>
+    </div>
+
+  {% endif %}
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}こころログ | LunaCare{% endblock %}
+
+{% block content %}
+
+<div class="page-title">
+  <h1>♥ こころログ</h1>
+  <p>
+    書けない日はハートだけでもOK。<br>
+    診察前に見返せるメンタルメモです。
+  </p>
+</div>
+
+<div class="card">
+  <div class="alert-title" style="font-size:18px;">
+    今日のこころ
+  </div>
+
+  <form method="POST">
+    <input type="hidden" name="log_date" value="{{ today }}">
+
+    <div class="form-row">
+      <label>こころの具合</label>
+
+      <div class="heart-select">
+        <label class="heart-option">
+          <input type="radio" name="heart_score" value="1">
+          <span>♡♡♡♡♡</span>
+        </label>
+
+        <label class="heart-option">
+          <input type="radio" name="heart_score" value="2">
+          <span>♥♡♡♡♡</span>
+        </label>
+
+        <label class="heart-option">
+          <input type="radio" name="heart_score" value="3" checked>
+          <span>♥♥♡♡♡</span>
+        </label>
+
+        <label class="heart-option">
+          <input type="radio" name="heart_score" value="4">
+          <span>♥♥♥♥♡</span>
+        </label>
+
+        <label class="heart-option">
+          <input type="radio" name="heart_score" value="5">
+          <span>♥♥♥♥♥</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label>状態タグ</label>
+      <select name="mood_tag">
+        <option value="">選択してください</option>
+        <option value="普通">普通</option>
+        <option value="不安">不安</option>
+        <option value="落ち込み">落ち込み</option>
+        <option value="イライラ">イライラ</option>
+        <option value="逃げたい">逃げたい</option>
+        <option value="過食しそう">過食しそう</option>
+        <option value="吐きそう">吐きそう</option>
+        <option value="生理前っぽい">生理前っぽい</option>
+        <option value="仕事つらい">仕事つらい</option>
+        <option value="安定">安定</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label>メモ</label>
+      <textarea
+        name="memo"
+        placeholder="例：今日は仕事がしんどかった / 何もしたくない / 生理前っぽい / ちょっと安定"
+      ></textarea>
+    </div>
+
+    <button class="btn" type="submit">
+      ♥ 保存する
+    </button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="alert-title" style="font-size:18px;">
+    📋 最近のこころログ
+  </div>
+
+  {% if logs %}
+    <div class="log-list">
+      {% for log in logs %}
+        <div class="log-item">
+          <div class="log-head">
+            <div style="color:var(--pink2); font-size:20px;">
+              {{ log.heart_display }}
+            </div>
+
+            <div class="small muted">
+              {{ log.log_date.strftime("%Y/%m/%d") }}
+            </div>
+          </div>
+
+          {% if log.mood_tag %}
+            <div style="margin-bottom:8px;">
+              <span class="pill"># {{ log.mood_tag }}</span>
+            </div>
+          {% endif %}
+
+          {% if log.memo %}
+            <div style="line-height:1.7;">
+              {{ log.memo }}
+            </div>
+          {% endif %}
+
+          <form
+            method="POST"
+            action="{{ url_for('diary_delete', log_id=log.id) }}"
+            style="margin-top:12px;"
+            onsubmit="return confirm('削除しますか？')"
+          >
+            <button class="btn btn-danger" type="submit">
+              削除
+            </button>
+          </form>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card-soft">
+      <div class="muted small">
+        まだこころログがありません。
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+{% endblock %}

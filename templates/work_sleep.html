@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block title %}仕事中睡眠ログ | LunaCare{% endblock %}
+
+{% block content %}
+
+<div class="page-title">
+  <h1>😴 仕事中睡眠ログ</h1>
+  <p>
+    「怠け」ではなく、心身負荷の記録です。<br>
+    眠気・逃避・気圧・メンタルとの関連確認に使います。
+  </p>
+</div>
+
+<div class="card">
+
+  <div class="alert-title" style="font-size:18px;">
+    😴 記録する
+  </div>
+
+  <form method="POST">
+
+    <div class="form-row">
+      <label>日時</label>
+
+      <input
+        type="datetime-local"
+        name="slept_at"
+        value="{{ now().strftime('%Y-%m-%dT%H:%M') if now else '' }}"
+      >
+    </div>
+
+    <div class="form-row">
+      <label>寝た時間（分）</label>
+
+      <input
+        type="number"
+        name="duration_minutes"
+        placeholder="例：10"
+      >
+    </div>
+
+    <div class="form-row">
+      <label>きっかけ</label>
+
+      <select name="trigger">
+        <option value="">選択してください</option>
+        <option value="眠気">眠気</option>
+        <option value="現実逃避">現実逃避</option>
+        <option value="ストレス">ストレス</option>
+        <option value="気圧">気圧</option>
+        <option value="生理前">生理前</option>
+        <option value="過集中後">過集中後</option>
+        <option value="不明">不明</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label>逃げたくなった理由</label>
+
+      <input
+        type="text"
+        name="escape_reason"
+        placeholder="例：電話対応 / タスク過多 / 人間関係"
+      >
+    </div>
+
+    <div class="form-row">
+      <label>仕事負荷レベル</label>
+
+      <select name="workload_level">
+        <option value="">選択してください</option>
+        <option value="1">1 - 余裕あり</option>
+        <option value="2">2</option>
+        <option value="3">3 - 普通</option>
+        <option value="4">4 - かなりしんどい</option>
+        <option value="5">5 - 限界</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label>メモ</label>
+
+      <textarea
+        name="memo"
+        placeholder="例：朝からずっとつらかった / 気圧低い / 吐き気もあった"
+      ></textarea>
+    </div>
+
+    <button class="btn" type="submit">
+      😴 保存する
+    </button>
+
+  </form>
+
+</div>
+
+<div class="card">
+
+  <div class="alert-title" style="font-size:18px;">
+    ⚡ クイック記録
+  </div>
+
+  <form method="POST" action="{{ url_for('work_sleep_quick') }}">
+    <button class="btn btn-sub" type="submit">
+      1タップで記録
+    </button>
+  </form>
+
+</div>
+
+<div class="card">
+
+  <div class="alert-title" style="font-size:18px;">
+    📋 最近のログ
+  </div>
+
+  {% if logs %}
+
+    <div class="log-list">
+
+      {% for log in logs %}
+
+        <div class="log-item">
+
+          <div class="log-head">
+
+            <div>
+              😴 仕事中睡眠
+            </div>
+
+            <div class="small muted">
+              {{ log.slept_at.strftime("%Y/%m/%d %H:%M") }}
+            </div>
+
+          </div>
+
+          <div style="
+            display:flex;
+            flex-wrap:wrap;
+            gap:8px;
+            margin-bottom:10px;
+          ">
+
+            {% if log.duration_minutes %}
+              <span class="pill">
+                ⏱ {{ log.duration_minutes }}分
+              </span>
+            {% endif %}
+
+            {% if log.trigger %}
+              <span class="pill">
+                ⚠ {{ log.trigger }}
+              </span>
+            {% endif %}
+
+            {% if log.workload_level %}
+              <span class="pill">
+                📈 負荷 {{ log.workload_level }}/5
+              </span>
+            {% endif %}
+
+          </div>
+
+          {% if log.escape_reason %}
+            <div style="margin-bottom:8px;">
+
+              <span class="pill">
+                🫠 {{ log.escape_reason }}
+              </span>
+
+            </div>
+          {% endif %}
+
+          {% if log.memo %}
+            <div style="line-height:1.7;">
+              {{ log.memo }}
+            </div>
+          {% endif %}
+
+          <form
+            method="POST"
+            action="{{ url_for('work_sleep_delete', log_id=log.id) }}"
+            style="margin-top:12px;"
+            onsubmit="return confirm('削除しますか？')"
+          >
+            <button class="btn btn-danger" type="submit">
+              削除
+            </button>
+          </form>
+
+        </div>
+
+      {% endfor %}
+
+    </div>
+
+  {% else %}
+
+    <div class="card-soft">
+      <div class="muted small">
+        まだログがありません。
+      </div>
+    </div>
+
+  {% endif %}
+
+</div>
+
+<div class="card">
+
+  <div class="alert-title" style="font-size:18px;">
+    ℹ️ このログについて
+  </div>
+
+  <div class="card-soft">
+
+    <div class="small muted" style="line-height:1.8;">
+
+      ・「逃げるために寝る」は精神負荷サインのことがあります。<br>
+      ・気圧・生理前・薬との関連を見るためのログです。<br>
+      ・診察時の説明材料にも使えます。<br>
+      ・責めるためではなく「観測するため」の記録です。
+
+    </div>
+
+  </div>
+
+</div>
+
+{% endblock %}

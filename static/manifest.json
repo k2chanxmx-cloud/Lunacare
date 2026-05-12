@@ -1,0 +1,22 @@
+{
+  "name": "LunaCare",
+  "short_name": "LunaCare",
+  "description": "入院回避のための体調・メンタルログ",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09000f",
+  "theme_color": "#12001f",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

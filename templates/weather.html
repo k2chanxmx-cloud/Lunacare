@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}気圧ログ | LunaCare{% endblock %}
+
+{% block content %}
+
+<div class="page-title">
+  <h1>☁️ 気圧ログ</h1>
+  <p>
+    気圧の現在値・3時間変化・6時間変化を確認します。<br>
+    眠気・頭痛・嘔吐との関連を見るための画面です。
+  </p>
+</div>
+
+<div class="card">
+  <div class="alert-title" style="font-size:18px;">
+    ☁️ 最新の気圧
+  </div>
+
+  {% if latest %}
+    <div class="grid">
+      <div class="stat">
+        <div class="stat-label">気圧</div>
+        <div class="stat-value">
+          {{ latest.pressure_msl }}<span class="small"> hPa</span>
+        </div>
+      </div>
+
+      <div class="stat">
+        <div class="stat-label">気温</div>
+        <div class="stat-value">
+          {{ latest.temperature }}<span class="small"> ℃</span>
+        </div>
+      </div>
+
+      <div class="stat">
+        <div class="stat-label">3時間変化</div>
+        <div class="stat-value
+          {% if latest.pressure_change_3h is not none and latest.pressure_change_3h <= -3 %}
+            danger-text
+          {% elif latest.pressure_change_3h is not none and latest.pressure_change_3h <= -1.5 %}
+            warning-text
+          {% endif %}
+        ">
+          {% if latest.pressure_change_3h is not none %}
+            {{ latest.pressure_change_3h }}
+          {% else %}
+            --
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="stat">
+        <div class="stat-label">6時間変化</div>
+        <div class="stat-value
+          {% if latest.pressure_change_6h is not none and latest.pressure_change_6h <= -5 %}
+            danger-text
+          {% elif latest.pressure_change_6h is not none and latest.pressure_change_6h <= -3 %}
+            warning-text
+          {% endif %}
+        ">
+          {% if latest.pressure_change_6h is not none %}
+            {{ latest.pressure_change_6h }}
+          {% else %}
+            --
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card-soft">
+      <div class="small muted">
+        最終更新：{{ latest.logged_at.strftime("%Y/%m/%d %H:%M") }}
+      </div>
+    </div>
+  {% else %}
+    <div class="card-soft">
+      <div class="muted small">
+        まだ気圧データがありません。<br>
+        <code>/weather/update</code> を開くと取得できます。
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="alert-title" style="font-size:18px;">
+    📋 最近の気圧ログ
+  </div>
+
+  {% if logs %}
+    <div class="log-list">
+      {% for log in logs %}
+        <div class="log-item">
+          <div class="log-head">
+            <div>☁️ {{ log.pressure_msl }} hPa</div>
+            <div class="small muted">
+              {{ log.logged_at.strftime("%m/%d %H:%M") }}
+            </div>
+          </div>
+
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <span class="pill">🌡 {{ log.temperature }}℃</span>
+
+            {% if log.pressure_change_3h is not none %}
+              <span class="pill">3h {{ log.pressure_change_3h }} hPa</span>
+            {% endif %}
+
+            {% if log.pressure_change_6h is not none %}
+              <span class="pill">6h {{ log.pressure_change_6h }} hPa</span>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card-soft">
+      <div class="muted small">
+        まだログがありません。
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+{% endblock %}

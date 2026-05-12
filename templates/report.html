@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+
+{% block title %}診察レポート | LunaCare{% endblock %}
+
+{% block content %}
+
+<div class="page-title">
+  <h1>📄 診察レポート</h1>
+  <p>
+    精神科・心療内科で見返すためのまとめ画面です。<br>
+    嘔吐・眠気・気圧・こころ状態を確認できます。
+  </p>
+</div>
+
+<div class="card">
+
+  <div class="alert-title" style="font-size:18px;">
+    📅 表示期間
+  </div>
+
+  <div class="btn-row" style="margin-top:12px;">
+
+    <a
+      class="btn {% if days == 7 %} {% else %}btn-sub{% endif %}"
+      href="{{ url_for('report', days=7) }}"
+    >
+      7日
+    </a>
+
+    <a
+      class="btn {% if days == 30 %} {% else %}btn-sub{% endif %}"
+      href="{{ url_for('report', days=30) }}"
+    >
+      30日
+    </a>
+
+    <a
+      class="btn {% if days == 90 %} {% else %}btn-sub{% endif %}"
+      href="{{ url_for('report', days=90) }}"
+    >
+      90日
+    </a>
+
+  </div>
+
+</div>
+
+<div class="grid">
+
+  <div class="stat">
+    <div class="stat-label">嘔吐回数</div>
+    <div class="stat-value">
+      {{ vomit_summary.total or 0 }}
+    </div>
+  </div>
+
+  <div class="stat">
+    <div class="stat-label">仕事中睡眠</div>
+    <div class="stat-value">
+      {{ sleep_summary.total or 0 }}
+    </div>
+  </div>
+
+  <div class="stat">
+    <div class="stat-label">平均こころ</div>
+    <div class="stat-value">
+      {{ diary_summary.avg_score or "-" }}
+    </div>
+  </div>
+
+  <div class="stat">
+    <div class="stat-label">最低こころ</div>
+    <div class="stat-value">
+      {{ diary_summary.min_score or "-" }}
+    </div>
+  </div>
+
+</div>
+
+<div class="card">
+
+  <div class="alert-title" style="font-size:18px;">
+    ☁️ 体調平均
+  </div>
+
+  <div class="grid">
+
+    <div class="stat">
+      <div class="stat-label">眠気</div>
+      <div class="stat-value">
+        {{ condition_summary.avg_sleepiness or "-" }}
+      </div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-label">頭痛</div>
+      <div class="stat-value">
+        {{ condition_summary.avg_headache or "-" }}
+      </div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-label">吐き気</div>
+      <div class="stat-value">
+        {{ condition_summary.avg_nausea or "-" }}
+      </div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-label">嘔吐感</div>
+      <div class="stat-value">
+        {{ condition_summary.avg_vomit_feeling or "-" }}
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<div class="card">
+
+  <div class="alert-title" style="font-size:18px;">
+    💊 服薬状況
+  </div>
+
+  {% if med_summary %}
+
+    <div class="log-list">
+
+      {% for med in med_summary %}
+
+        <div class="log-item">
+
+          <div class="log-head">
+
+            <div>
+              {{ med.name }}
+            </div>
+
+          </div>
+
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+
+            <span class="pill">
+              ✓ {{ med.taken_count or 0 }}回
+            </span>
+
+            <span class="pill">
+              ⚠ {{ med.missed_count or 0 }}回
+            </span>
+
+          </div>
+
+        </div>
+
+      {% endfor %}
+
+    </div>
+
+  {% else %}
+
+    <div class="card-soft">
+      <div class="muted small">
+        薬データがありません。
+      </div>
+    </div>
+
+  {% endif %}
+
+</div>
+
+<div class="card">
+
+  <div class="alert-title" style="font-size:18px;">
+    🫧 最近の嘔吐ログ
+  </div>
+
+  {% if recent_vomits %}
+
+    <div class="log-list">
+
+      {% for log in recent_vomits[:10] %}
+
+        <div class="log-item">
+
+          <div class="log-head">
+
+            <div>
+              🫧 嘔吐
+            </div>
+
+            <div class="small muted">
+              {{ log.vomited_at.strftime("%m/%d %H:%M") }}
+            </div>
+
+          </div>
+
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+
+            {% if log.food %}
+              <span class="pill">
+                🍽 {{ log.food }}
+              </span>
+            {% endif %}
+
+            {% if log.trigger %}
+              <span class="pill">
+                ⚠ {{ log.trigger }}
+              </span>
+            {% endif %}
+
+          </div>
+
+          {% if log.memo %}
+            <div style="margin-top:10px; line-height:1.7;">
+              {{ log.memo }}
+            </div>
+          {% endif %}
+
+        </div>
+
+      {% endfor %}
+
+    </div>
+
+  {% else %}
+
+    <div class="card-soft">
+      <div class="muted small">
+        嘔吐ログがありません。
+      </div>
+    </div>
+
+  {% endif %}
+
+</div>
+
+<div class="card">
+
+  <div class="alert-title" style="font-size:18px;">
+    ♥ 最近のこころログ
+  </div>
+
+  {% if recent_diaries %}
+
+    <div class="log-list">
+
+      {% for log in recent_diaries[:10] %}
+
+        <div class="log-item">
+
+          <div class="log-head">
+
+            <div style="color:var(--pink2);">
+              {{ log.heart_display }}
+            </div>
+
+            <div class="small muted">
+              {{ log.log_date.strftime("%m/%d") }}
+            </div>
+
+          </div>
+
+          {% if log.mood_tag %}
+            <div style="margin-bottom:8px;">
+              <span class="pill">
+                # {{ log.mood_tag }}
+              </span>
+            </div>
+          {% endif %}
+
+          {% if log.memo %}
+            <div style="line-height:1.7;">
+              {{ log.memo }}
+            </div>
+          {% endif %}
+
+        </div>
+
+      {% endfor %}
+
+    </div>
+
+  {% else %}
+
+    <div class="card-soft">
+      <div class="muted small">
+        こころログがありません。
+      </div>
+    </div>
+
+  {% endif %}
+
+</div>
+
+<div class="card">
+
+  <div class="alert-title" style="font-size:18px;">
+    ☁️ 最近の体調ログ
+  </div>
+
+  {% if recent_conditions %}
+
+    <div class="log-list">
+
+      {% for log in recent_conditions[:10] %}
+
+        <div class="log-item">
+
+          <div class="log-head">
+
+            <div>
+              ☁️ 体調
+            </div>
+
+            <div class="small muted">
+              {{ log.log_date.strftime("%m/%d") }}
+            </div>
+
+          </div>
+
+          <div style="
+            display:flex;
+            flex-wrap:wrap;
+            gap:8px;
+            margin-bottom:10px;
+          ">
+
+            {% if log.sleepiness_level %}
+              <span class="pill">
+                😴 {{ log.sleepiness_level }}/5
+              </span>
+            {% endif %}
+
+            {% if log.headache_level %}
+              <span class="pill">
+                🤕 {{ log.headache_level }}/5
+              </span>
+            {% endif %}
+
+            {% if log.nausea_level %}
+              <span class="pill">
+                🤢 {{ log.nausea_level }}/5
+              </span>
+            {% endif %}
+
+            {% if log.pressure_msl %}
+              <span class="pill">
+                ☁️ {{ log.pressure_msl }}hPa
+              </span>
+            {% endif %}
+
+          </div>
+
+          {% if log.memo %}
+            <div style="line-height:1.7;">
+              {{ log.memo }}
+            </div>
+          {% endif %}
+
+        </div>
+
+      {% endfor %}
+
+    </div>
+
+  {% else %}
+
+    <div class="card-soft">
+      <div class="muted small">
+        体調ログがありません。
+      </div>
+    </div>
+
+  {% endif %}
+
+</div>
+
+{% endblock %}

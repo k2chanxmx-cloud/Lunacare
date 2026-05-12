@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}薬管理 | LunaCare{% endblock %}
+
+{% block content %}
+
+<div class="page-title">
+  <h1>💊 薬管理</h1>
+  <p>
+    薬のマスタ管理です。<br>
+    通知・服薬チェック・飲み忘れ判定に使用します。
+  </p>
+</div>
+
+<div class="card">
+
+  <div class="alert-title" style="font-size:18px;">
+    💊 薬を追加
+  </div>
+
+  <form method="POST">
+
+    <div class="form-row">
+      <label>薬名</label>
+      <input
+        type="text"
+        name="name"
+        placeholder="例：アトモキセチン"
+        required
+      >
+    </div>
+
+    <div class="form-row">
+      <label>錠数・量</label>
+      <input
+        type="text"
+        name="dose"
+        placeholder="例：1錠 / 20mg"
+      >
+    </div>
+
+    <div class="form-row">
+      <label>服薬時間</label>
+      <input
+        type="time"
+        name="take_time"
+      >
+    </div>
+
+    <div class="form-row">
+      <label>タイミング</label>
+
+      <select name="timing_label">
+        <option value="">選択してください</option>
+        <option value="朝">朝</option>
+        <option value="昼">昼</option>
+        <option value="夜">夜</option>
+        <option value="寝る前">寝る前</option>
+        <option value="食前">食前</option>
+        <option value="食後">食後</option>
+      </select>
+
+    </div>
+
+    <div class="form-row">
+      <label>メモ</label>
+
+      <textarea
+        name="memo"
+        placeholder="例：飲み忘れ注意 / 生理前に増量"
+      ></textarea>
+    </div>
+
+    <button class="btn" type="submit">
+      💊 保存する
+    </button>
+
+  </form>
+
+</div>
+
+<div class="card">
+
+  <div class="alert-title" style="font-size:18px;">
+    📋 薬一覧
+  </div>
+
+  {% if medicines %}
+
+    <div class="log-list">
+
+      {% for med in medicines %}
+
+        <div class="log-item">
+
+          <div class="log-head">
+
+            <div>
+              {{ med.name }}
+            </div>
+
+            <div class="small muted">
+              {% if med.is_active %}
+                使用中
+              {% else %}
+                停止中
+              {% endif %}
+            </div>
+
+          </div>
+
+          <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+
+            {% if med.dose %}
+              <span class="pill">
+                💊 {{ med.dose }}
+              </span>
+            {% endif %}
+
+            {% if med.take_time %}
+              <span class="pill">
+                ⏰
+                {% if med.take_time.__class__.__name__ != 'str' %}
+                  {{ med.take_time.strftime("%H:%M") }}
+                {% else %}
+                  {{ med.take_time }}
+                {% endif %}
+              </span>
+            {% endif %}
+
+            {% if med.timing_label %}
+              <span class="pill">
+                {{ med.timing_label }}
+              </span>
+            {% endif %}
+
+          </div>
+
+          {% if med.memo %}
+            <div style="line-height:1.7; margin-bottom:12px;">
+              {{ med.memo }}
+            </div>
+          {% endif %}
+
+          <div class="btn-row">
+
+            <form
+              method="POST"
+              action="{{ url_for('medicine_toggle', medicine_id=med.id) }}"
+              style="flex:1;"
+            >
+
+              {% if med.is_active %}
+                <button class="btn btn-sub" type="submit">
+                  停止
+                </button>
+              {% else %}
+                <button class="btn" type="submit">
+                  再開
+                </button>
+              {% endif %}
+
+            </form>
+
+            <form
+              method="POST"
+              action="{{ url_for('medicine_delete', medicine_id=med.id) }}"
+              style="flex:1;"
+              onsubmit="return confirm('削除しますか？')"
+            >
+              <button class="btn btn-danger" type="submit">
+                削除
+              </button>
+            </form>
+
+          </div>
+
+        </div>
+
+      {% endfor %}
+
+    </div>
+
+  {% else %}
+
+    <div class="card-soft">
+      <div class="muted small">
+        まだ薬が登録されていません。
+      </div>
+    </div>
+
+  {% endif %}
+
+</div>
+
+<div class="card">
+
+  <div class="alert-title" style="font-size:18px;">
+    ℹ️ この画面について
+  </div>
+
+  <div class="card-soft">
+
+    <div class="small muted" style="line-height:1.8;">
+
+      ・ここで登録した薬はホーム画面に表示されます。<br>
+      ・後から通知機能を追加できます。<br>
+      ・停止にすると履歴は残したまま非表示になります。<br>
+      ・飲み忘れと体調悪化の関連も後で確認できます。
+
+    </div>
+
+  </div>
+
+</div>
+
+{% endblock %}
