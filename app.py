@@ -87,12 +87,12 @@ def fetch_weather_from_open_meteo():
         "latitude": LATITUDE,
         "longitude": LONGITUDE,
         "hourly": "pressure_msl,surface_pressure,temperature_2m,weather_code",
-        "forecast_days": 2,
+        "forecast_days": 1,
         "past_days": 1,
         "timezone": TIMEZONE,
     }
 
-    res = requests.get(url, params=params, timeout=20)
+    res = requests.get(url, params=params, timeout=8)
     res.raise_for_status()
     data = res.json()
 
