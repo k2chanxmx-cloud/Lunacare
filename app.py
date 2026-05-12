@@ -7,7 +7,7 @@ import psycopg2
 import psycopg2.extras
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    jsonify, flash
+    jsonify, flash, g
 )
 from dotenv import load_dotenv
 
@@ -28,33 +28,50 @@ def inject_now():
     return {"now": datetime.now}
 
 
+# =========================
+# DB共通：1リクエスト1接続
+# =========================
 def get_conn():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL が設定されていません")
-    return psycopg2.connect(DATABASE_URL)
+
+    if "db_conn" not in g:
+        g.db_conn = psycopg2.connect(DATABASE_URL)
+
+    return g.db_conn
+
+
+@app.teardown_appcontext
+def close_db_conn(exception=None):
+    conn = g.pop("db_conn", None)
+    if conn is not None:
+        conn.close()
 
 
 def query_all(sql, params=None):
-    with get_conn() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(sql, params or ())
-            return cur.fetchall()
+    conn = get_conn()
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(sql, params or ())
+        return cur.fetchall()
 
 
 def query_one(sql, params=None):
-    with get_conn() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(sql, params or ())
-            return cur.fetchone()
+    conn = get_conn()
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(sql, params or ())
+        return cur.fetchone()
 
 
 def execute(sql, params=None):
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(sql, params or ())
-            conn.commit()
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute(sql, params or ())
+        conn.commit()
 
 
+# =========================
+# 共通
+# =========================
 def today_str():
     return date.today().isoformat()
 
@@ -686,14 +703,6 @@ def check_alerts():
         ORDER BY logged_at DESC
         LIMIT 1
     """)
-
-    latest_condition = query_one("""
-        SELECT *
-        FROM body_condition_logs
-        WHERE DATE(logged_at) = %s
-        ORDER BY logged_at DESC, created_at DESC
-        LIMIT 1
-    """, (today,))
 
     today_condition_max = query_one("""
         SELECT
