@@ -304,20 +304,14 @@ def weather():
 # =========================
 @app.route("/")
 def index():
-	auto_update_weather_if_needed()
-	
+    auto_update_weather_if_needed()
+
     today = now_jst().date()
 
     vomit_count = query_one("""
         SELECT COUNT(*) AS count
         FROM vomit_logs
         WHERE DATE(vomited_at) = %s
-    """, (today,))["count"]
-
-    sleep_count = query_one("""
-        SELECT COUNT(*) AS count
-        FROM work_sleep_logs
-        WHERE DATE(slept_at) = %s
     """, (today,))["count"]
 
     active_cycle = query_one("""
