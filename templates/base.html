@@ -429,26 +429,37 @@
     {% block content %}{% endblock %}
   </div>
 
-  <nav class="bottom-nav">
-    <a class="nav-item {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">
-      <span>🏠</span>ホーム
-    </a>
-    <a class="nav-item {% if request.endpoint == 'vomit' %}active{% endif %}" href="{{ url_for('vomit') }}">
-      <span>🫧</span>嘔吐
-    </a>
-    <a class="nav-item {% if request.endpoint == 'condition' %}active{% endif %}" href="{{ url_for('condition') }}">
-      <span>☁️</span>体調
-    </a>
-    <a class="nav-item {% if request.endpoint == 'diary' %}active{% endif %}" href="{{ url_for('diary') }}">
-      <span>💜</span>心
-    </a>
-    <a class="nav-item {% if request.endpoint == 'medicines' %}active{% endif %}" href="{{ url_for('medicines') }}">
-      <span>💊</span>薬
-    </a>
-    <a class="nav-item {% if request.endpoint == 'report' %}active{% endif %}" href="{{ url_for('report') }}">
-      <span>📄</span>診察
-    </a>
-  </nav>
+<nav class="bottom-nav">
+
+  <a class="nav-item {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">
+    <span>🏠</span>ホーム
+  </a>
+
+  <a class="nav-item {% if request.endpoint == 'vomit' %}active{% endif %}" href="{{ url_for('vomit') }}">
+    <span>🫧</span>嘔吐
+  </a>
+
+  <a class="nav-item {% if request.endpoint == 'condition' %}active{% endif %}" href="{{ url_for('condition') }}">
+    <span>☁️</span>体調
+  </a>
+
+  <a class="nav-item {% if request.endpoint == 'diary' %}active{% endif %}" href="{{ url_for('diary') }}">
+    <span>💜</span>心
+  </a>
+
+  <a class="nav-item {% if request.endpoint == 'analysis' %}active{% endif %}" href="{{ url_for('analysis') }}">
+    <span>📊</span>分析
+  </a>
+
+  <a class="nav-item {% if request.endpoint == 'medicines' %}active{% endif %}" href="{{ url_for('medicines') }}">
+    <span>💊</span>薬
+  </a>
+
+  <a class="nav-item {% if request.endpoint == 'report' %}active{% endif %}" href="{{ url_for('report') }}">
+    <span>📄</span>診察
+  </a>
+
+</nav>
 
   <script>
     if ("serviceWorker" in navigator) {

@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+
+{% block title %}相関分析 | LunaCare{% endblock %}
+
+{% block content %}
+
+<div class="page-title">
+  <h1>📊 相関分析</h1>
+  <p>
+    気圧・こころ・生理前・薬・嘔吐の関係を見ます。<br>
+    診察前の振り返りにも使えます。
+  </p>
+</div>
+
+<div class="card">
+  <div class="alert-title" style="font-size:18px;">
+    📅 分析期間
+  </div>
+
+  <div class="btn-row" style="margin-top:12px;">
+    <a class="btn {% if days == 7 %}{% else %}btn-sub{% endif %}" href="{{ url_for('analysis', days=7) }}">7日</a>
+    <a class="btn {% if days == 30 %}{% else %}btn-sub{% endif %}" href="{{ url_for('analysis', days=30) }}">30日</a>
+    <a class="btn {% if days == 90 %}{% else %}btn-sub{% endif %}" href="{{ url_for('analysis', days=90) }}">90日</a>
+  </div>
+
+  <div class="card-soft">
+    <div class="small muted">
+      対象期間：{{ start_date.strftime("%Y/%m/%d") }} 〜 今日 / {{ total_days }}日間
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="alert-title" style="font-size:18px;">
+    ☁️ 気圧レベル × 体調
+  </div>
+
+  {% if pressure_condition %}
+    <div class="log-list">
+      {% for row in pressure_condition %}
+        {% set level = row.pressure_level|string %}
+        {% set label = pressure_level_map.get(level, "通常") %}
+
+        <div class="log-item">
+          <div class="log-head">
+            <div>
+              ☁️ {{ label }}
+            </div>
+            <div class="small muted">
+              {{ row.log_count }}件
+            </div>
+          </div>
+
+          <div class="grid">
+            <div class="stat">
+              <div class="stat-label">平均眠気</div>
+              <div class="stat-value">{{ row.avg_sleepiness or "-" }}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">平均頭痛</div>
+              <div class="stat-value">{{ row.avg_headache or "-" }}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">平均吐き気</div>
+              <div class="stat-value">{{ row.avg_nausea or "-" }}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">平均嘔吐感</div>
+              <div class="stat-value">{{ row.avg_vomit_feeling or "-" }}</div>
+            </div>
+          </div>
+
+          <div class="card-soft">
+            <div class="small muted">
+              最大：眠気 {{ row.max_sleepiness or "-" }} /
+              頭痛 {{ row.max_headache or "-" }} /
+              吐き気 {{ row.max_nausea or "-" }} /
+              嘔吐感 {{ row.max_vomit_feeling or "-" }}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card-soft">
+      <div class="small muted">
+        まだ分析できる体調ログがありません。
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="alert-title" style="font-size:18px;">
+    💜 こころ低めの日
+  </div>
+
+  <div class="grid">
+    <div class="stat">
+      <div class="stat-label">こころ低めの日</div>
+      <div class="stat-value">{{ low_heart_days.low_heart_day_count or 0 }}日</div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-label">その日の嘔吐</div>
+      <div class="stat-value">{{ low_heart_days.vomit_count or 0 }}回</div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-label">その日の仕事中睡眠</div>
+      <div class="stat-value">{{ low_heart_days.work_sleep_count or 0 }}回</div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-label">目安</div>
+      <div class="stat-value" style="font-size:18px;">
+        {% if (low_heart_days.vomit_count or 0) >= 3 or (low_heart_days.work_sleep_count or 0) >= 2 %}
+          注意
+        {% else %}
+          観察
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card-soft">
+    <div class="small muted">
+      こころスコアが2以下の日に、嘔吐や仕事中睡眠が重なっているかを見る項目です。
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="alert-title" style="font-size:18px;">
+    🌙 生理前モード × 嘔吐
+  </div>
+
+  <div class="grid">
+    <div class="stat">
+      <div class="stat-label">生理前モード日数</div>
+      <div class="stat-value">{{ cycle_vomit.cycle_day_count or 0 }}日</div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-label">生理前中の嘔吐</div>
+      <div class="stat-value">{{ cycle_vomit.vomit_count or 0 }}回</div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-label">通常日数</div>
+      <div class="stat-value">{{ non_cycle_vomit.non_cycle_day_count or 0 }}日</div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-label">通常日の嘔吐</div>
+      <div class="stat-value">{{ non_cycle_vomit.vomit_count or 0 }}回</div>
+    </div>
+  </div>
+
+  <div class="card-soft">
+    <div class="small muted">
+      生理前モード中に嘔吐が増えるかを確認します。
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="alert-title" style="font-size:18px;">
+    💊 薬スキップ × 体調
+  </div>
+
+  {% if medicine_skip_condition %}
+    <div class="log-list">
+      {% for med in medicine_skip_condition %}
+        <div class="log-item">
+          <div class="log-head">
+            <div>{{ med.name }}</div>
+            <div class="small muted">スキップ {{ med.skip_count or 0 }}回</div>
+          </div>
+
+          <div class="grid">
+            <div class="stat">
+              <div class="stat-label">眠気</div>
+              <div class="stat-value">{{ med.avg_sleepiness or "-" }}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">頭痛</div>
+              <div class="stat-value">{{ med.avg_headache or "-" }}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">吐き気</div>
+              <div class="stat-value">{{ med.avg_nausea or "-" }}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">嘔吐感</div>
+              <div class="stat-value">{{ med.avg_vomit_feeling or "-" }}</div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card-soft">
+      <div class="small muted">
+        薬のスキップ記録がまだありません。
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="alert-title" style="font-size:18px;">
+    🫧 嘔吐トリガーランキング
+  </div>
+
+  {% if trigger_vomit %}
+    <div class="log-list">
+      {% for row in trigger_vomit %}
+        <div class="log-item">
+          <div class="log-head">
+            <div>⚠ {{ row.trigger }}</div>
+            <div>{{ row.count }}回</div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card-soft">
+      <div class="small muted">嘔吐ログがまだありません。</div>
+    </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="alert-title" style="font-size:18px;">
+    🍽 食べ物別 嘔吐回数
+  </div>
+
+  {% if food_vomit %}
+    <div class="log-list">
+      {% for row in food_vomit %}
+        <div class="log-item">
+          <div class="log-head">
+            <div>🍽 {{ row.food }}</div>
+            <div>{{ row.count }}回</div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card-soft">
+      <div class="small muted">食べ物メモがまだありません。</div>
+    </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="alert-title" style="font-size:18px;">
+    📆 最近14日のまとめ
+  </div>
+
+  {% if daily_summary %}
+    <div class="log-list">
+      {% for row in daily_summary %}
+        <div class="log-item">
+          <div class="log-head">
+            <div>{{ row.d.strftime("%m/%d") }}</div>
+            <div class="small muted">
+              {% if row.max_pressure_level is not none %}
+                ☁️ {{ pressure_level_map.get(row.max_pressure_level|string, "通常") }}
+              {% else %}
+                ☁️ -
+              {% endif %}
+            </div>
+          </div>
+
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <span class="pill">🫧 嘔吐 {{ row.vomit_count }}</span>
+            <span class="pill">😴 睡眠 {{ row.work_sleep_count }}</span>
+
+            {% if row.min_heart_score %}
+              <span class="pill">💜 心 {{ row.min_heart_score }}</span>
+            {% endif %}
+
+            {% if row.max_sleepiness %}
+              <span class="pill">眠気 {{ row.max_sleepiness }}</span>
+            {% endif %}
+
+            {% if row.max_headache %}
+              <span class="pill">頭痛 {{ row.max_headache }}</span>
+            {% endif %}
+
+            {% if row.max_nausea %}
+              <span class="pill">吐き気 {{ row.max_nausea }}</span>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card-soft">
+      <div class="small muted">まとめるデータがありません。</div>
+    </div>
+  {% endif %}
+</div>
+
+{% endblock %}
