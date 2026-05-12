@@ -19,40 +19,27 @@
 
   <form method="POST">
     <input type="hidden" name="log_date" value="{{ today }}">
+    <input type="hidden" id="heartScore" name="heart_score" value="3">
 
     <div class="form-row">
       <label>こころの具合</label>
 
-      <div class="heart-select">
-        <label class="heart-option">
-          <input type="radio" name="heart_score" value="1">
-          <span>♡♡♡♡♡</span>
-        </label>
+      <div class="heart-tap-wrap">
+        <span class="heart-single" data-score="1">♡</span>
+        <span class="heart-single" data-score="2">♡</span>
+        <span class="heart-single" data-score="3">♡</span>
+        <span class="heart-single" data-score="4">♡</span>
+        <span class="heart-single" data-score="5">♡</span>
+      </div>
 
-        <label class="heart-option">
-          <input type="radio" name="heart_score" value="2">
-          <span>♥♡♡♡♡</span>
-        </label>
-
-        <label class="heart-option">
-          <input type="radio" name="heart_score" value="3" checked>
-          <span>♥♥♡♡♡</span>
-        </label>
-
-        <label class="heart-option">
-          <input type="radio" name="heart_score" value="4">
-          <span>♥♥♥♥♡</span>
-        </label>
-
-        <label class="heart-option">
-          <input type="radio" name="heart_score" value="5">
-          <span>♥♥♥♥♥</span>
-        </label>
+      <div id="heartLabel" class="small muted" style="margin-top:10px;">
+        ♥♥♥♡♡ / 3
       </div>
     </div>
 
     <div class="form-row">
       <label>状態タグ</label>
+
       <select name="mood_tag">
         <option value="">選択してください</option>
         <option value="普通">普通</option>
@@ -70,9 +57,10 @@
 
     <div class="form-row">
       <label>メモ</label>
+
       <textarea
         name="memo"
-        placeholder="例：今日は仕事がしんどかった / 何もしたくない / 生理前っぽい / ちょっと安定"
+        placeholder="例：今日は仕事がしんどかった / 逃げたかった / 生理前っぽい / ちょっと安定"
       ></textarea>
     </div>
 
@@ -89,10 +77,12 @@
 
   {% if logs %}
     <div class="log-list">
+
       {% for log in logs %}
         <div class="log-item">
+
           <div class="log-head">
-            <div style="color:var(--pink2); font-size:20px;">
+            <div style="font-size:22px; color:var(--pink2);">
               {{ log.heart_display }}
             </div>
 
@@ -102,13 +92,15 @@
           </div>
 
           {% if log.mood_tag %}
-            <div style="margin-bottom:8px;">
-              <span class="pill"># {{ log.mood_tag }}</span>
+            <div style="margin-bottom:10px;">
+              <span class="pill">
+                # {{ log.mood_tag }}
+              </span>
             </div>
           {% endif %}
 
           {% if log.memo %}
-            <div style="line-height:1.7;">
+            <div style="line-height:1.8;">
               {{ log.memo }}
             </div>
           {% endif %}
@@ -116,23 +108,152 @@
           <form
             method="POST"
             action="{{ url_for('diary_delete', log_id=log.id) }}"
-            style="margin-top:12px;"
+            style="margin-top:14px;"
             onsubmit="return confirm('削除しますか？')"
           >
             <button class="btn btn-danger" type="submit">
               削除
             </button>
           </form>
+
         </div>
       {% endfor %}
+
     </div>
+
   {% else %}
+
     <div class="card-soft">
       <div class="muted small">
         まだこころログがありません。
       </div>
     </div>
+
   {% endif %}
 </div>
 
+{% endblock %}
+
+{% block head %}
+<style>
+
+.heart-tap-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+
+  padding: 18px;
+
+  border-radius: 24px;
+
+  background: rgba(255,255,255,0.05);
+
+  border: 1px solid var(--line);
+}
+
+.heart-single {
+  font-size: 42px;
+
+  cursor: pointer;
+
+  user-select: none;
+
+  transition:
+    transform 0.12s ease,
+    color 0.12s ease,
+    text-shadow 0.12s ease;
+
+  color: rgba(255,255,255,0.28);
+}
+
+.heart-single.active {
+  color: var(--pink2);
+
+  text-shadow:
+    0 0 10px rgba(255,79,216,0.4),
+    0 0 24px rgba(255,79,216,0.25);
+}
+
+.heart-single:hover {
+  transform: scale(1.12);
+}
+
+.heart-single:active {
+  transform: scale(0.88);
+}
+
+@media (max-width: 430px) {
+
+  .heart-single {
+    font-size: 34px;
+  }
+
+  .heart-tap-wrap {
+    gap: 10px;
+    padding: 14px;
+  }
+
+}
+
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+
+const heartButtons = document.querySelectorAll(".heart-single");
+
+const heartScoreInput = document.getElementById("heartScore");
+
+const heartLabel = document.getElementById("heartLabel");
+
+
+function updateHearts(score) {
+
+  heartScoreInput.value = score;
+
+  let display = "";
+
+  heartButtons.forEach((button) => {
+
+    const buttonScore = Number(button.dataset.score);
+
+    if (buttonScore <= score) {
+
+      button.textContent = "♥";
+
+      button.classList.add("active");
+
+      display += "♥";
+
+    } else {
+
+      button.textContent = "♡";
+
+      button.classList.remove("active");
+
+      display += "♡";
+    }
+
+  });
+
+  heartLabel.textContent = display + " / " + score;
+}
+
+
+heartButtons.forEach((button) => {
+
+  button.addEventListener("click", function () {
+
+    updateHearts(Number(this.dataset.score));
+
+  });
+
+});
+
+
+updateHearts(3);
+
+</script>
 {% endblock %}
