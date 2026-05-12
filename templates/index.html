@@ -60,6 +60,9 @@
   </div>
 
   {% if weather_latest %}
+    {% set level = weather_latest.weather_code|string if weather_latest.weather_code is not none else "0" %}
+    {% set level_label = pressure_level_map.get(level, "通常") %}
+
     <div class="grid">
       <div class="stat">
         <div class="stat-label">現在の気圧</div>
@@ -69,40 +72,36 @@
       </div>
 
       <div class="stat">
-        <div class="stat-label">3時間変化</div>
+        <div class="stat-label">気圧レベル</div>
         <div class="stat-value
-          {% if weather_latest.pressure_change_3h is not none and weather_latest.pressure_change_3h <= -3 %}
+          {% if level|int >= 4 %}
             danger-text
-          {% elif weather_latest.pressure_change_3h is not none and weather_latest.pressure_change_3h <= -1.5 %}
+          {% elif level|int >= 3 %}
             warning-text
           {% endif %}
         ">
-          {% if weather_latest.pressure_change_3h is not none %}
-            {{ weather_latest.pressure_change_3h }}<span class="small"> hPa</span>
-          {% else %}
-            --
-          {% endif %}
+          {{ level_label }}
         </div>
       </div>
     </div>
 
     <div class="card-soft">
-      <div class="small muted">
+      {% if weather_latest.temperature %}
+        <div class="small muted">
+          気温：{{ weather_latest.temperature }}℃
+        </div>
+      {% endif %}
+
+      <div class="small muted" style="margin-top:4px;">
         最終更新：
         {{ weather_latest.logged_at.strftime("%Y/%m/%d %H:%M") if weather_latest.logged_at else "" }}
       </div>
-
-      {% if weather_latest.pressure_change_6h is not none %}
-        <div class="small muted" style="margin-top:4px;">
-          6時間変化：{{ weather_latest.pressure_change_6h }} hPa
-        </div>
-      {% endif %}
     </div>
   {% else %}
     <div class="card-soft">
       <div class="muted small">
         まだ気圧データがありません。<br>
-        Render公開後に <code>/weather/update</code> を開くと取得できます。
+        <code>/weather/update</code> を開くと取得できます。
       </div>
     </div>
   {% endif %}
@@ -126,12 +125,26 @@
         <div class="stat-value">{{ condition.vomit_feeling_level or "-" }}/5</div>
       </div>
     </div>
+
+    {% if condition_count_today %}
+      <div class="card-soft">
+        <div class="small muted">
+          今日の体調記録：{{ condition_count_today }}件
+        </div>
+      </div>
+    {% endif %}
   {% endif %}
 
   <div class="btn-row" style="margin-top:12px;">
     <a class="btn btn-sub" href="{{ url_for('condition') }}">体調を記録</a>
     <a class="btn btn-sub" href="{{ url_for('weather') }}">気圧を見る</a>
   </div>
+
+  <form method="GET" action="{{ url_for('weather_update') }}" style="margin-top:10px;">
+    <button class="btn btn-sub" type="submit">
+      ☁️ 気圧を更新
+    </button>
+  </form>
 </div>
 
 <div class="card">
